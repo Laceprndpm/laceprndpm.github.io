@@ -1,0 +1,465 @@
+# ============================================================
+# Keep Theme Configuration
+# 文件位置：博客根目录/_config.keep.yml
+#
+# 原则：
+# - 阅读体验优先
+# - 保留分类、标签、TOC、代码工具
+# - 首屏、统计、动画、打赏等默认关闭
+# ============================================================
+
+
+# ------------------------------------------------------------
+# 基本信息
+# ------------------------------------------------------------
+base_info:
+  # 主题主色：链接、按钮等强调元素
+  primary_color: "#0066cc"
+
+  # 网站标题
+  title: Keep Blog
+
+  # 作者名
+  author: Laceprndpm
+
+  # 作者头像
+  # 可以是本地路径，如 /images/avatar.png
+  # 也可以是完整 URL
+  avatar: /images/avatar.svg
+
+  # 网站 Logo
+  logo: /images/logo.svg
+
+  # 浏览器标签页 favicon
+  favicon: /images/logo.svg
+
+
+# ------------------------------------------------------------
+# 顶部导航栏
+#
+# 若开启 tags/categories/about 等页面，需要先创建页面，例如：
+#   hexo new page tags
+#   hexo new page categories
+#   hexo new page about
+#
+# 后续还需要设置对应页面的 type。
+# ------------------------------------------------------------
+menu:
+  home: /
+  archives: /archives
+
+  # 技术博客建议开启
+  tags: /tags
+  categories: /categories
+
+  # 有需要再开
+  # links: /links
+  # photos: /photos
+  # tools: /tools
+  # about: /about
+
+
+# ------------------------------------------------------------
+# 首页大首屏
+#
+# enable=true 时首页顶部出现较大的背景图/介绍区域。
+# 你的博客偏阅读型，建议关闭。
+# ------------------------------------------------------------
+first_screen:
+  enable: false
+
+  # 日间模式背景
+  background_img: /images/bg.svg
+
+  # 夜间模式背景
+  background_img_dark: /images/bg.svg
+
+  # 首屏描述
+  # 使用 || 可以换行
+  description: Keep writing and Keep loving.
+
+  # 随机“一言”
+  # 开启后 description 会动态变化
+  hitokoto: false
+
+
+# ------------------------------------------------------------
+# 社交联系方式
+#
+# enable=true 后展示 GitHub / Email 等社交链接。
+# ------------------------------------------------------------
+social_contact:
+  enable: false
+
+  links:
+    github:
+    weixin:
+    qq:
+    weibo:
+    zhihu:
+    twitter:
+    x:
+    facebook:
+    email:
+
+
+# ------------------------------------------------------------
+# 页面滚动行为
+# ------------------------------------------------------------
+scroll:
+  # 页面顶部显示阅读进度条
+  progress_bar: false
+
+  # 显示当前页面阅读百分比
+  percent: false
+
+  # 向下滚动时自动隐藏顶部导航栏
+  # 推荐开启，减少正文阅读干扰
+  hide_header: true
+
+
+# ------------------------------------------------------------
+# 首页文章列表
+# ------------------------------------------------------------
+home:
+  # 首页公告
+  # 留空表示不显示
+  announcement:
+
+  # 首页文章卡片显示所属分类
+  category: true
+
+  # 首页文章卡片显示标签
+  tag: true
+
+  # 首页显示哪个时间：
+  # created = 创建时间
+  # updated = 最后修改时间
+  #
+  # 技术博客我更推荐 created，
+  # 否则修个错字也可能把文章显示成“刚更新”。
+  post_datetime: created
+
+
+# ------------------------------------------------------------
+# 文章页面
+# ------------------------------------------------------------
+post:
+
+  # 作者 Badge
+  # 例如 Lv1 / Lv2 之类。
+  # 阅读型技术博客没什么必要。
+  author_badge:
+    enable: false
+
+    # true：自动显示等级
+    # false：使用下面 custom_badge
+    level_badge: false
+
+    custom_badge:
+      - Author
+
+  # 字数统计 / 阅读时间
+  #
+  # 需要额外安装：
+  #   npm install hexo-wordcount
+  word_count:
+    # 显示文章字数
+    wordcount: false
+
+    # 显示预计阅读时间
+    min2read: false
+
+  # 正文时间显示格式
+  datetime_format: "YYYY-MM-DD"
+
+  # 文章底部版权声明
+  copyright_info: false
+
+  # 分享按钮
+  share: false
+
+  # 打赏功能
+  reward:
+    enable: false
+
+    # 收款二维码
+    img_link:
+
+    # 打赏文字
+    text:
+
+    # 自定义图标
+    icon:
+
+
+# ------------------------------------------------------------
+# 代码块
+#
+# 对你的 Kernel / Runtime / LLVM 技术博客建议开启。
+# ------------------------------------------------------------
+code_block:
+  tools:
+    # 开启后提供：
+    # - 复制按钮
+    # - 代码语言显示
+    # - 代码折叠等工具
+    enable: true
+
+    # default = 普通样式
+    # mac     = macOS 窗口按钮风格
+    style: default
+
+  # default  = 默认亮色
+  # obsidian = 深色代码块
+  highlight_theme: default
+
+
+# ------------------------------------------------------------
+# TOC 文章目录
+#
+# 长技术文章非常有用，建议开启。
+# ------------------------------------------------------------
+toc:
+  enable: true
+
+  # 自动给目录编号，例如：
+  # 1
+  # 1.1
+  # 1.2
+  number: false
+
+  # true：始终展开所有层级
+  # false：主要显示当前阅读区域
+  expand_all: false
+
+  # 打开文章时默认展开 TOC
+  init_open: true
+
+  # left / right
+  # 推荐 right
+  layout: right
+
+
+# ------------------------------------------------------------
+# 网站访问统计
+#
+# 基于“不蒜子”。
+# 不需要统计可以全部关闭，页面也更干净。
+# ------------------------------------------------------------
+website_count:
+  busuanzi_count:
+    # 总开关
+    enable: false
+
+    # 独立访客 UV
+    site_uv: false
+
+    # 全站访问量 PV
+    site_pv: false
+
+    # 单篇文章 PV
+    page_pv: false
+
+
+# ------------------------------------------------------------
+# 本地搜索
+#
+# 开启需要：
+#   npm install hexo-generator-searchdb
+#
+# 文章多了以后再打开即可。
+# ------------------------------------------------------------
+local_search:
+  enable: false
+
+  # 页面打开时提前加载搜索索引
+  # true 搜索响应更快，但首页会多加载数据
+  preload: false
+
+
+# ------------------------------------------------------------
+# 评论系统
+#
+# Keep 当前支持：
+# valine
+# gitalk
+# twikoo
+# waline
+# giscus
+# artalk
+# disqus
+#
+# 你以后准备自己做评论后端的话，
+# 这里可以暂时全部关闭。
+# ------------------------------------------------------------
+comment:
+  enable: false
+
+  # 如果 enable=true，在这里选择评论系统
+  use: giscus
+
+  # ---------- Valine ----------
+  valine:
+    appid:
+    appkey:
+    server_urls:
+    placeholder:
+
+  # ---------- Gitalk ----------
+  gitalk:
+    github_id:
+    github_admins:
+    repository:
+    client_id:
+    client_secret:
+    proxy:
+
+  # ---------- Twikoo ----------
+  twikoo:
+    env_id:
+    region:
+    version: 1.6.39
+
+  # ---------- Waline ----------
+  waline:
+    server_url:
+
+    # 是否允许文章表情 Reaction
+    reaction: false
+
+    version: 3.3.2
+
+  # ---------- Giscus ----------
+  # 基于 GitHub Discussions
+  giscus:
+    repo:
+    repo_id:
+
+    # GitHub Discussions 分类
+    category: Announcements
+    category_id:
+
+    # 是否开启 reaction
+    reactions_enabled: false
+
+  # ---------- Artalk ----------
+  artalk:
+    server:
+
+  # ---------- Disqus ----------
+  disqus:
+    shortname:
+
+
+# ------------------------------------------------------------
+# RSS
+#
+# 开启前安装：
+#   npm install hexo-generator-feed
+#
+# 技术博客以后可以考虑开启。
+# ------------------------------------------------------------
+rss:
+  enable: false
+
+
+# ------------------------------------------------------------
+# 图片懒加载
+#
+# 图片很多时有意义。
+# 目前文章以文字/代码为主可以关闭。
+# ------------------------------------------------------------
+lazyload:
+  enable: false
+
+
+# ------------------------------------------------------------
+# CDN
+#
+# 控制 Keep 自己的一些静态依赖是否走公共 CDN。
+# GitHub Pages 本身已经很快，可以先不开。
+# ------------------------------------------------------------
+cdn:
+  enable: false
+
+  # 可选：
+  # cdnjs
+  # jsdelivr
+  # unpkg
+  provider: cdnjs
+
+  # 自己提供 CDN 时使用
+  custom:
+    enable: false
+    url:
+
+
+# ------------------------------------------------------------
+# PJAX
+#
+# 不重新加载整个网页就切换页面。
+# 会让网站更像 SPA。
+#
+# 优点：
+#   切换页面更顺滑
+#
+# 缺点：
+#   自定义 JS / 评论 / 第三方组件容易出现生命周期问题
+#
+# 你的目标是简单稳定，建议关闭。
+# ------------------------------------------------------------
+pjax:
+  enable: false
+
+
+# ------------------------------------------------------------
+# 页脚
+# ------------------------------------------------------------
+footer:
+  # 博客开始年份
+  # 页脚可显示 2026 - 当前年份
+  since: 2026
+
+  # 显示全站总字数
+  # 同样依赖 hexo-wordcount
+  word_count: false
+
+  # 显示部署平台信息
+  site_deploy:
+    enable: false
+
+    # github / vercel / netlify /
+    # cloudflare / gitee / aliyun /
+    # tencent_cloud / upyun
+    provider: github
+
+    # 部署平台链接
+    url:
+
+  # ICP 等备案信息
+  # 你的 blog.sparks.cam 如果部署 GitHub Pages，
+  # 通常不需要配置。
+  record:
+    enable: false
+
+    list:
+      # 示例：
+      # - code: "皖ICP备xxxx号"
+      #   link: "https://beian.miit.gov.cn"
+
+
+# ------------------------------------------------------------
+# 自定义 CSS / JS 注入
+#
+# 以后想微调字体、正文宽度、代码样式时非常有用。
+# 尽量通过这里扩展，而不是直接修改 Keep 源码。
+# ------------------------------------------------------------
+inject:
+  enable: false
+
+  css:
+    # - /css/custom.css
+
+  js:
+    # - /js/custom.js
