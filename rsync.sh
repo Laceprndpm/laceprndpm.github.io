@@ -1,3 +1,3 @@
 rsync -av --delete \
-  /home/patchouli/Voile/blog/web/* \
+  /home/patchouli/Voile/AI/AI-Infra-note/* \
   ~/Projects/blog/source/_posts/

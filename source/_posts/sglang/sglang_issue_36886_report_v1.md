@@ -11,11 +11,14 @@ mathjax: true
 
 # SGLang Issue #36886 调查报告（第一版）
 
-**主题：DCP 下 index-K 容量与主 c-KV 寻址约定失配**
+**面向读者：** 已了解 SGLang 基本 serving/runtime 架构，希望理解 DCP、DSA 与 KV 内存管理的工程师。本文通过容量与寻址失配案例，说明如何沿索引的生产者、消费者及实际存储范围排查状态相关故障。
+
+**核心问题与结论：** 为什么服务重启后正常，经过长请求后才异常？两个缺陷需要分别解释：index-K 保留 global virtual loc，但 buffer 容量不足；主 c-KV 应分片并转换索引，却漏掉 owner filter 与 global → local 映射。
+
+**范围与依据：** 以下版本、公开材料及验证状态限定本文结论。
 
 | 项目 | 范围 |
 |---|---|
-| 面向读者 | 已了解 SGLang 基本 serving/runtime 架构，希望理解 DCP、DSA 与 KV 内存管理的工程师 |
 | 原始问题 | SGLang Issue #36886 |
 | 问题版本 | `033446bb05f35c0943aed2750c443077ffc0b92c`，GLM-5.3-Flash 支持分支 |
 | 修复参考 | PR \#36989；本次查阅的 head 为 `017d5cb6c92954a0126a80412b193c93e3a94cce` |
@@ -25,8 +28,6 @@ mathjax: true
 本文先梳理已经有依据的**症状、架构、根因和修复**。第 2 节区分公开材料中的排查线索与仍待补齐的调试过程；第 6 节中的实验结果均注明为原作者报告，不作为本文作者的实测结果。
 
 截至本次查阅，PR #36989 为 **closed、未通过该 PR 合并**。本文讨论的是该修复方案，不据此判断当前 `main` 是否已包含其他等价修复。其端到端验证范围是 **H100 + TileLang + BF16 KV**，不能直接外推到其他 attention backend。[[1]][r1] [[2]][r2]
-
-> 核心结论：两个缺陷不能混为一种。**index-K 应该保留 global virtual loc，但 buffer 容量不足；主 c-KV 应该分片并转换索引，却漏掉了 owner filter 与 global → local 映射。**
 
 ---
 
@@ -189,6 +190,7 @@ index-K 用于选择历史 token，主 c-KV 用于真正的 sparse attention。�
 ```
 
 这里 **RAGGED 是布局，RAGGED top-k transform 是适配该布局的索引操作**。PAGED transform 则将位置映射到 paged cache slot。
+
 ## 4. 根因：两个不同的约定失配
 
 ### 4.1 Defect 1：index-K 索引正确，但容量不足
@@ -415,7 +417,7 @@ local index 范围与真实 tensor shape：
 
 这些是后续实验要求，不是本版已经完成的测试。
 
-## 7. 经验：不要把不同 index space 混成一种
+## 7. 可迁移的方法与未解问题：不要把不同 index space 混成一种
 
 ### 7.1 给索引附上 consumer，而不只看变量名
 
@@ -473,7 +475,10 @@ DCP 扩展 allocator 的逻辑 slot 空间
 
 **DSA（DeepSeek Sparse Attention）** 在主 attention 前增加 indexer，利用独立的 index-K 为历史 token 打分并选择 top-k，再访问对应的 compressed KV（c-KV）进行 sparse attention。index-K 负责选择位置，c-KV 保存真正参与主 attention 的表示。在本 issue 涉及的 DCP 方案中，index-K 保持 replicated/global-indexed，而主 c-KV 应为 sharded/local-indexed；这两种存储约定的差异是理解两个 defect 的起点。[[1]][r1] [[2]][r2]
 
-## 参考资料
+## 参考与复现材料
+
+公开问题、补丁和固定版本源码列于下方。本文独立复现材料：—。**待补：** 尚未独立运行 GPU 复现，缺少本地最小复现、首个错误操作日志和隔离补丁结果；第 6.4 节保留记录格式，不能以原作者结果替代本地实测。
+
 
 1. **[SGLang Issue #36886][r1]**：原始故障报告、两个 defect、复现环境、验证结果，以及 2026-08-29 的容量断言更新。原作者：`junliu-mde`。
 2. **[SGLang PR #36989][r2]**：修复方案、验证范围和提交状态。标题：*fix(dcp): GLM-5.3-Flash norope c-KV sharding under DCP (Hopper/tilelang only)*。
