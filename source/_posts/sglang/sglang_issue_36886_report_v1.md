@@ -1,5 +1,6 @@
 ---
 title: SGLang Issue #36886
+date: 2026-09-08 18:14:47 +08:00
 tags:
   - SGLang
   - DCP

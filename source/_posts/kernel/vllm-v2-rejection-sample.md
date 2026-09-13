@@ -1,5 +1,6 @@
 ---
 title: 国产芯片算子优化：Rejection Sampling
+date: 2026-09-13 18:37:13 +08:00
 tags:
   - 算子优化
   - AI-Infra
