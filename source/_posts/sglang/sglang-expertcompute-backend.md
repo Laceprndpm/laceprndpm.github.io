@@ -13,6 +13,10 @@ categories:
 mathjax: true
 ---
 
+沿 expert-major 接收布局追踪 Triton 专家计算，解释 CUDA Graph 下的动态工作量，以及 TBO 微批拆分如何影响计算成本。
+
+<!-- more -->
+
 # SGLang Expert Compute Backend：从接收布局到 Triton 专家计算
 
 本文接续SGLang Runtime，介绍 dispatch 通信接收完成后、combine 通信开始前的数据适配与专家计算；只展开 Triton 后端，以 expert-major 为主线、rank-major 为布局对照。

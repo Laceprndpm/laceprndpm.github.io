@@ -10,6 +10,10 @@ categories:
 mathjax: true
 ---
 
+通过 SGLang Issue 36886，分析 DCP 场景中 KV 缓存容量与地址映射失配的根因及修复思路。
+
+<!-- more -->
+
 # SGLang Issue #36886 调查报告（第一版）
 
 **面向读者：** 已了解 SGLang 基本 serving/runtime 架构，希望理解 DCP、DSA 与 KV 内存管理的工程师。本文通过容量与寻址失配案例，说明如何沿索引的生产者、消费者及实际存储范围排查状态相关故障。

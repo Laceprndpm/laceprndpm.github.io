@@ -10,6 +10,11 @@ categories:
   - 框架
 mathjax: true
 ---
+
+沿一次 Eager decode 梳理 SGLang 执行运行时的对象关系、资源所有权与数据流，厘清 ModelRunner、runner 和 backend 的分工。
+
+<!-- more -->
+
 # SGLang Execution Runtime 入门：职责边界、对象资源与动态数据流
 
 **面向读者：** 已初步了解 SGLang 请求处理、调度和模型执行，但还不清楚执行层内部对象如何协作的开发者。本文帮助读者区分对象职责、长期资源与本轮数据，并沿一次普通 decode 追踪它们的关系。

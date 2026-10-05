@@ -12,6 +12,10 @@ categories:
 mathjax: true
 ---
 
+从 SGLang 调用追踪到 NCCL 通信与 MoE dispatch/combine，解释数据身份、执行依赖和资源生命周期如何决定正确性与性能。
+
+<!-- more -->
+
 # SGLang、NCCL 与 MoE EP：从职责边界到执行机制
 
 **面向读者：** 已熟悉 CUDA、异步执行与 SGLang Runtime，并看过 NCCL EP Python 接口，但还不能把接口调用与底层通信机制连起来的读者。本文从通信概念开始，帮助读者区分对象职责，追踪一次 AllReduce 和一次 MoE dispatch/combine，并分析正确性条件与性能成本。
