@@ -17,7 +17,7 @@ base_info:
   primary_color: "#0066cc"
 
   # 网站标题
-  title: Keep Blog
+  title: Infra Notes
 
   # 作者名
   author: Laceprndpm
@@ -25,13 +25,13 @@ base_info:
   # 作者头像
   # 可以是本地路径，如 /images/avatar.png
   # 也可以是完整 URL
-  avatar: /images/avatar.svg
+  avatar: /images/monogram.svg
 
   # 网站 Logo
-  logo: /images/logo.svg
+  logo: /images/monogram.svg
 
   # 浏览器标签页 favicon
-  favicon: /images/logo.svg
+  favicon: /images/monogram.svg
 
 
 # ------------------------------------------------------------
@@ -456,10 +456,10 @@ footer:
 # 尽量通过这里扩展，而不是直接修改 Keep 源码。
 # ------------------------------------------------------------
 inject:
-  enable: false
+  enable: true
 
   css:
-    # - /css/custom.css
+    - /css/custom.css
 
   js:
     # - /js/custom.js

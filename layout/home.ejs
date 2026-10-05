@@ -1,0 +1,40 @@
+<% const sidebar = site.data.home_sidebar; %>
+<div class="notes-home">
+  <aside class="notes-sidebar" aria-label="作者与专题导航">
+    <section class="notes-profile" aria-labelledby="notes-author">
+      <img class="notes-avatar" src="<%= url_for(theme.base_info.avatar) %>" alt="" width="56" height="56">
+      <div class="notes-profile-copy">
+        <p class="notes-eyebrow">FIELD NOTES</p>
+        <h1 id="notes-author"><%= config.author %></h1>
+        <p class="notes-bio"><%= config.description %></p>
+        <a class="notes-github" href="<%= sidebar.github %>" target="_blank" rel="noopener noreferrer">
+          <i class="fa-brands fa-github" aria-hidden="true"></i>
+          GitHub <span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </section>
+    <nav class="notes-topics" aria-labelledby="notes-topics-title">
+      <h2 class="notes-section-title" id="notes-topics-title">按专题阅读</h2>
+      <ul>
+        <% sidebar.topics.forEach((topic, index) => { %>
+          <li>
+            <a href="<%= url_for(topic.path) %>">
+              <span class="notes-topic-number" aria-hidden="true"><%= String(index + 1).padStart(2, '0') %></span>
+              <span>
+                <span class="notes-topic-name"><%= topic.name %></span>
+                <span class="notes-topic-description"><%= topic.description %></span>
+              </span>
+            </a>
+          </li>
+        <% }); %>
+      </ul>
+    </nav>
+  </aside>
+  <section class="notes-feed" aria-labelledby="notes-feed-title">
+    <div class="notes-feed-heading">
+      <h2 id="notes-feed-title">最新文章</h2>
+      <span><%= site.posts.length %> 篇笔记</span>
+    </div>
+    <%- partial('_page/keep-home') %>
+  </section>
+</div>

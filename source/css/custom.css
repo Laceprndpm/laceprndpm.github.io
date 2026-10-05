@@ -1,0 +1,231 @@
+.page-container .page-main-content.is-home .main-content,
+.page-container .page-main-content.is-home .header-content {
+  width: calc(100% - 64px);
+  max-width: 1120px;
+}
+
+.notes-home {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+  gap: 40px;
+}
+
+.notes-sidebar {
+  position: sticky;
+  top: calc(var(--header-height) + 24px);
+  color: var(--text-color-3);
+  background: var(--content-background-color);
+  border: 1px solid var(--background-color-3);
+  border-radius: 12px;
+}
+
+.notes-profile,
+.notes-topics {
+  padding: 24px 20px;
+}
+
+.notes-avatar {
+  display: block;
+  margin-bottom: 20px;
+  border-radius: 14px;
+}
+
+.notes-eyebrow,
+.notes-section-title {
+  margin: 0 0 12px;
+  color: var(--text-color-3);
+  font: 500 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.1em;
+}
+
+.notes-profile h1 {
+  margin: 0;
+  color: var(--text-color-1);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.notes-bio {
+  margin: 12px 0 18px;
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.notes-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-color-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.notes-github:hover,
+.notes-topics a:hover .notes-topic-name {
+  color: var(--primary-color);
+}
+
+.notes-sidebar a:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.notes-topics {
+  border-top: 1px solid var(--background-color-3);
+}
+
+.notes-topics ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notes-topics li + li {
+  margin-top: 4px;
+}
+
+.notes-topics a {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 -8px;
+  padding: 10px 8px;
+  color: var(--text-color-3);
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.notes-topics a:hover {
+  background: var(--background-color-2);
+}
+
+.notes-topic-number {
+  color: var(--primary-color);
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.notes-topic-name,
+.notes-topic-description {
+  display: block;
+}
+
+.notes-topic-name {
+  color: var(--text-color-1);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.notes-topic-description {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.notes-feed {
+  min-width: 0;
+}
+
+.notes-feed-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+}
+
+.notes-feed-heading h2 {
+  margin: 0;
+  color: var(--text-color-1);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.notes-feed-heading span {
+  color: var(--text-color-3);
+  font-size: 12px;
+}
+
+@media (max-width: 1099px) {
+  .page-container .page-main-content.is-home .main-content,
+  .page-container .page-main-content.is-home .header-content {
+    width: 88%;
+    max-width: 960px;
+  }
+
+  .notes-home {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .notes-sidebar {
+    position: static;
+  }
+
+  .notes-profile {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .notes-avatar {
+    flex-shrink: 0;
+    margin-bottom: 0;
+  }
+
+  .notes-profile h1 {
+    font-size: 18px;
+  }
+
+  .notes-bio {
+    margin: 6px 0 10px;
+  }
+
+  .notes-eyebrow,
+  .notes-topics {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-container .page-main-content.is-home .main-content,
+  .page-container .page-main-content.is-home .header-content {
+    width: calc(100% - 32px);
+  }
+
+  .header-wrapper .header-content .left .site-name {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+
+  .notes-profile {
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .notes-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+
+  .notes-home .home-post-list .home-post-item .home-post-item-bottom {
+    padding: 1.4rem;
+  }
+}
+
+@media (max-height: 760px) {
+  .notes-sidebar {
+    position: static;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notes-home .home-content-container {
+    animation: none;
+  }
+}

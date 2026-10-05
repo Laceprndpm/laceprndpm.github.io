@@ -1,0 +1,11 @@
+github: https://github.com/Laceprndpm
+topics:
+  - name: SGLang / Runtime
+    description: 架构、执行与通信
+    path: /tags/SGLang/
+  - name: Kernel 优化
+    description: 数据流、精度与软件流水
+    path: /categories/算子优化/
+  - name: LLVM
+    description: 编译链路与性能诊断
+    path: /tags/LLVM/
