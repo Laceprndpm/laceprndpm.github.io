@@ -74,9 +74,9 @@ mathjax: true
 
 一个输入 token 在这里首先是一行 hidden activation：`x[t] ∈ R^H`。Router 产生专家分数，选择策略给出 K 个专家 ID 与相应权重。对本文的 routed 分支，可以写成：
 
-\[
+$$
 y_t^{routed}=\sum_{k=0}^{K-1}w_{t,k}F_{e_{t,k}}(x_t).
-\]
+$$
 
 `F_e` 是专家网络；在这条 gated SiLU 路径中，它包含 gate/up 投影、激活与逐元素乘法、down 投影。Router 的分数生成、top-k 选择和专家 GEMM 是不同步骤。模型还可能有独立 shared expert，其输出对当前 token 另行计算，再按模型规定与 routed 输出组合。
 
@@ -91,9 +91,9 @@ flowchart LR
     S --> Y
 ```
 
-对追踪 token，目标是 `0.25·F₁(x₂,₅)+0.75·F₆(x₂,₅)`。若两个专家输出的第一个坐标分别是 4 和 12，这个坐标的 routed 结果就是 10。此例只指定输出以核算合成，不把专家简化成线性函数。
+对追踪 token，目标是 `0.25·F₁(x₂,₅)+0.75·F₆(x₂,₅)`。若两个专家输出的第一个坐标分别是 4 和 12，这个坐标的 routed 结果就是 10。
 
-权重通常应作用在专家输出上。将输入改成 `w·x` 再执行非线性专家，一般不能保持 `F(w·x)=w·F(x)`。因此“在何处乘权重”是数据契约的一部分。所研究的 Triton 适配禁止 `apply_router_weight_on_input`，实际路由权重保留给 NCCL EP combine。[Triton 适配源码][s-triton]
+权重通常应作用在专家输出上。将输入改成 `w·x` 再执行非线性专家，一般不能保持 `F(w·x)=w·F(x)`。因此“在何处乘权重”是数据契约的一部分，取决于具体模型定义（如Lama 4）。所研究的 Triton 适配禁止 `apply_router_weight_on_input`，实际路由权重保留给 NCCL EP combine。[Triton 适配源码][s-triton]
 
 ### 1.2 专家分布到不同 GPU 后，增加什么工作？
 
@@ -101,9 +101,9 @@ flowchart LR
 
 源 rank 拥有 token，并不意味着它拥有该 token 选中的专家。Rank 2 拥有 E4、E5，但 token 5 要去 E1、E6，因此执行需要三件事：
 
-1. **Dispatch：**依据路由，把 activation 及必要身份信息送至拥有目标专家的 rank，并准备专家能使用的布局。
-2. **Expert compute：**在目标 rank 对各专家收到的有效行执行其网络。
-3. **Combine：**把结果关联回原始 token，完成回传与加权合成。
+1. **Dispatch**：依据路由，把 activation 及必要身份信息送至拥有目标专家的 rank，并准备专家能使用的布局。
+2. **Expert compute**：在目标 rank 对各专家收到的有效行执行其网络。
+3. **Combine**：把结果关联回原始 token，完成回传与加权合成。
 
 输入 token 只有 112 个，token–expert 计算关系却有 `112×2=224` 条。路由复制是逻辑关系；物理通信可以对同一目标 rank 去重，不能把路由条数直接当作网络消息数。第 4 层会给出这一路径的具体实现。
 
@@ -113,17 +113,17 @@ Rank 0 没有自己的输入 token，但持有 E0、E1，仍要接收远端工�
 
 一个 **NCCL communicator** 建立一组参与者的通信上下文。**Collective** 是这组参与者共同完成的操作；每个 rank 的调用必须在参与者、操作顺序及对应参数上匹配。通信对象是 tensor 中的数值，NCCL 不知道这些数值在模型里叫 token 还是梯度。
 
-| 操作 | 输入与输出关系 | 在本文中的用途 |
-|---|---|---|
-| Send / Recv | 指定参与者之间发送与接收 | 理解一条传输边 |
-| Broadcast | 根 rank 的数据提供给组内参与者 | 建立“谁拥有结果”的概念 |
-| Reduce | 按 SUM 等规则归约，指定 rank 得到结果 | 建立归约语义 |
-| AllReduce | 对应位置归约后，每个 rank 都有完整结果 | 问题一的目标 |
-| ReduceScatter | 先归约，结果按 rank 分片保留 | Ring AllReduce 的前半部分 |
-| AllGather | 收集每个 rank 的分片，所有 rank 得到完整集合 | Ring AllReduce 的后半部分 |
-| All-to-All | 各 rank 给不同目标发送不同数据 | 理解 EP 的交换关系；不限定其实现 API |
+| 操作            | 输入与输出关系                      | 在本文中的用途                |
+| ------------- | ---------------------------- | ---------------------- |
+| Send / Recv   | 指定参与者之间发送与接收                 | 理解一条传输边                |
+| Broadcast     | 根 rank 的数据提供给组内参与者           | 建立“谁拥有结果”的概念           |
+| Reduce        | 按 SUM 等规则归约，指定 rank 得到结果     | 建立归约语义                 |
+| AllReduce     | 对应位置归约后，每个 rank 都有完整结果       | 问题一的目标                 |
+| ReduceScatter | 先归约，结果按 rank 分片保留            | Ring AllReduce 的前半部分   |
+| AllGather     | 收集每个 rank 的分片，所有 rank 得到完整集合 | Ring AllReduce 的后半部分   |
+| All-to-All    | 各 rank 给不同目标发送不同数据           | 理解 EP 的交换关系；不限定其实现 API |
 
-SUM AllReduce 满足 `y_r[i]=Σ_q x_q[i]`。其中 AllReduce 规定结果分布，SUM 规定归约规则。ReduceScatter 再接 AllGather 可以实现这一数学目标，但具体 NCCL kernel 能把相邻步骤融合，不要求用户提交两次 API。[通信语义][n-collectives]
+SUM AllReduce 满足 $y_r[i]=\sum_q x_q[i]$。其中 AllReduce 规定结果分布，SUM 规定归约规则。ReduceScatter 再接 AllGather 可以实现这一数学目标，但具体 NCCL kernel 能把相邻步骤融合，不要求用户提交两次 API。[通信语义][n-collectives]
 
 MoE dispatch 包含不规则目的地、身份映射和布局转换，未必通过一个普通 All-to-All API 实现。后续我们将直接追入 EP 的设备端通信。
 
@@ -141,7 +141,7 @@ MoE dispatch 包含不规则目的地、身份映射和布局转换，未必通�
 
 Backend 与 Runtime 在 stream、CUDA Graph 和资源复用处相接；“具体算子实现”也有执行和生命周期责任。一个模型使用的通常是 backend 组合：选择 NCCL EP 并不替代专家 GEMM backend，也不决定 attention 的实现。[接入路径][s-dispatch]
 
-**本层自检：**如果把 NCCL EP 换成另一种通信 backend，专家函数与 MoE 数学目标可保持不变；需要重新确认的是路由、布局、数值格式和执行契约是否兼容。
+**本层自检**：如果把 NCCL EP 换成另一种通信 backend，专家函数与 MoE 数学目标可保持不变；需要重新确认的是路由、布局、数值格式和执行契约是否兼容。
 
 <a id="level-2"></a>
 
@@ -168,12 +168,12 @@ TP 表示一个计算被 tensor 分片共同执行，DP 表示数据工作在组
 
 SGLang 取得已有 NCCL communicator，将其包装后传给 `nccl.ep.Group.create`，创建 EP group。[对象创建源码][s-dispatch]
 
-| 对象 | 实际负责的内容 |
-|---|---|
-| NCCL communicator | rank 身份、通信参与者与底层通信连接 |
-| EP group | EP 配置、共享通信缓冲区、收发进度、通知资源和缓冲区轮换状态 |
-| EP handle | 当前路由的引用、token↔专家 slot 映射、布局信息和等待 `complete()` 提交的后续操作 |
-| SGLang 分配的 tensor | 输入、专家接收输出、`expert_counters` 和最终 combine 输出等 |
+| 对象                | 实际负责的内容                                               |
+| ----------------- | ----------------------------------------------------- |
+| NCCL communicator | rank 身份、通信参与者与底层通信连接                                  |
+| EP group          | EP 配置、共享通信缓冲区、收发进度、通知资源和缓冲区轮换状态                       |
+| EP handle         | 当前路由的引用、token↔专家 slot 映射、布局信息和等待 `complete()` 提交的后续操作 |
+| SGLang 分配的 tensor | 输入、专家接收输出、`expert_counters` 和最终 combine 输出等           |
 
 源码依据：[EP group 与 EP handle 的定义][ep-host]、[SGLang tensor 分配][s-dispatch]。
 
@@ -196,40 +196,169 @@ EP group
 
 ### 2.3 实际存储、有效范围与身份
 
-定义 `T_r` 为本轮源 token 数，`C` 为每 rank 发送容量，`M=W·C` 为每个本地专家预留的接收行容量。指定路径的主要数据如下。
+本节限定为附录 B 的固定版本：**SGLang NCCL EP、native LL、`EXPERT_MAJOR`、BF16 通信、接收后 FP8 量化、Triton 专家计算**。SGLang 复用了名为 `DeepEPLLDispatchOutput` 的返回结构，但本节通信由 NCCL EP 执行。
 
-| 对象 | shape / 类型 | 读者必须知道的含义 |
+**最终专家输入是 `[L,W·C,H]`，每个专家的有效数据占据连续前缀。`W·C` 只是容量，不能把它拆开后解释为“每个来源 rank 固定占 C 行”。接收端 native CUDA kernel 在 dispatch 内完成按专家展开和 compact；Triton 接手时，这一步已经完成。** [SGLang 调用][s-dispatch]、[native 接收 kernel][ep-device]
+
+#### 2.3.1 源 rank：一份 activation，K 条路由
+
+定义 `W` 为 EP rank 数，`L` 为每 rank 的专家数，`T_r` 为源 rank 本轮提交的 token 行数，`C` 为每 rank 发送容量上限，`M=W·C`。CUDA Graph 的提交行数可能包含 padding；无效行通过 `topk_ids=-1` 排除，不产生有效路由。
+
+| 源端对象 | shape / 类型 | 实际含义 |
 |---|---|---|
-| `hidden_states` | `[T_r,H]`，BF16 | 原始 token-major activation |
-| `topk_ids` | `[T_r,K]`，int64 | global expert IDs；CUDA Graph 路径中的无效行可用 -1 |
-| `topk_weights` | `[T_r,K]`，FP32 | 源 token 的合成权重 |
-| `recv_tokens` | `[L,M,H]`，BF16 | 接收后 expert-major 存储 |
-| `expert_counters` | `[L]`，int32 | 每个专家实际有效行数 |
-| FP8 专家输入 | `[L,M,H]` | 接收后量化结果 |
-| group scales | `[L,M,H/128]`，FP32 | 每行每 128 个 hidden 元素的缩放 |
-| 专家输出 | `[L,M,H]`，本路径为 BF16 | 与接收 slot 对应的专家结果 |
-| `combined` | 分配 `[C,H]`，返回 `[:T_r]` | 恢复 token-major 的本地输出 |
+| `hidden_states` | `[T_r,H]`，BF16 | token-major；一个 token 只有一行 activation |
+| `topk_ids` | `[T_r,K]`，本路径 int64 | 每个 token 选择的 K 个 global expert IDs |
+| `topk_weights` | `[T_r,K]`，FP32 | 每条路由的合成权重，保留在源端供 combine 使用 |
 
-`M` 是容量，counter 是本轮有效范围。对补全路由，E0、E1、E6、E7 的计数为 `111,1,1,111`，其余为 0。Rank 0 的两项 counter 是 `[111,1]`，但分配的接收 shape 仍是 `[2,256,4096]`。BF16 接收区占 4 MiB，FP8 区占 2 MiB，FP32 scales 占 64 KiB。分配量不能直接当成通信量或 GEMM 运算量。
+例如 token `(r,t)` 选择 E0、E1，输入仍只有 `hidden_states[t,:]` 一份，未预先扩成 `[T_r,K,H]`。发送 kernel 读取这一行和它的 top-k 路由，生成带原 token 行号、专家 ID 列表的消息 header。本路径不在 dispatch 消息中携带 top-k 权重，也不先给 activation 乘权重。[发送 kernel][ep-device]、[EXPERT_MAJOR 参数约束][ep-host]
 
-返回对象中的 `expected_m` 是估计量；决定有效行的是实际 counter。特别是在本地 token 数不均匀时，不能拿一个平均估计替代收到的数据量。
+#### 2.3.2 发送：同一个 token 发往同一个目标 rank，只发送一份 payload
 
-SGLang 还分配 `expert_offsets` 和 `recv_total` 并传入 `LayoutInfo`。在所选 native LL dispatch 分支，计算消费直接依赖的是 `expert_counters`；不能因为字段存在就假设它包含有效 compact 前缀和。`ncclEpUpdateHandle` 的 HT 预处理路径会处理 offsets/total，而当前 SGLang 的 LL 调用没有据此组织专家计算。[SGLang 存储分配][s-dispatch]、[native metadata 与 dispatch][ep-host]
-
-最关键的身份关系是：
+去重的单位是 **`(source_rank, token_row, destination_rank)`**。同一个 token 的多个目标专家若在同一目标 rank，只让这些路由中的第一个 top-k 位置发消息；header 仍保留各条专家路由。不同 token 不会因为 activation 相同而合并，同一 token 发往不同目标 rank 仍需各发一份。[去重与发送 slot 分配][ep-device]
 
 ```text
-(source_rank, token_row, topk_position)
-       → 传输暂存区里的 token slot
-       → (local_expert, expert_receive_slot)
-       → expert_output_slot
-       → (original_token_row, topk_position)
-       → combined[original_token_row]
+同一个 token 选 E0、E1；二者都在 rank 0：
+  源端一份 x → 向 rank 0 发一份 x + 路由 header
+             → rank 0 接收后为 E0、E1 各写一份专家输入
+
+同一个 token 选 E1、E6；分别在 rank 0、rank 3：
+  源端一份 x → 向 rank 0 发一份，向 rank 3 再发一份
 ```
 
-传输 slot 与专家接收 slot 是两个不同索引。第 4 层会给出 source-info 表的实际偏移；现在先保留它们之间需要显式映射这一事实。
+因此，对 token `t`，发送份数是其有效 top-k 路由中不同目标 rank 的数量；专家计算次数仍是有效专家路由数。本文补全示例中，每个 token 的两个专家都分处两个 rank，所以有 224 份目标端 token 消息，恰好没有利用到同目标 rank 去重。这是 token 消息计数，不是 NIC packet 数。
 
-### 2.4 Graph executable 与分批执行如何改变对象关系？
+发送侧为每个目标 rank 维护计数，通过 `u=atomicAdd(rankSentCnt+d,1)` 分配消息 slot。`u` 是“源 rank 发往 d 的消息序号”，不保证等于原 token 行号 `t`；原始 `t` 保存在 header 中。
+
+#### 2.3.3 传输接收暂存：按来源 rank 分区，还没有 expert 维
+
+目标 rank 的 native 接收暂存区为每个来源 rank 预留 C 个消息 slot。若只看 payload 的逻辑位置，可理解为 `[W,C,H]`；真实内存还包含 header 等字段，不能直接把整个通信 buffer 当作一个 BF16 三维 tensor。
+
+| 传输路径 | 每个来源 rank 分区内的物理组织 | 发送时的数据搬运 |
+|---|---|---|
+| 跨 LSA 的 RDMA 路径 | C 条记录，每条内部依次为：`header → payload → recipe 附加字段` | 先把消息放入源端发送暂存，再由 GIN put 传输 |
+| 同 LSA、P2P 可达路径 | C 个 header 连续排列，其后是 C 个 payload slot | header 来自发送暂存；payload 从源 activation 直接写到对端暂存，省去 payload 经源端发送暂存的中转 |
+
+这里的 payload/scales 字节组织由量化 recipe 决定；本文 BF16 路径不传输后续 SGLang 生成的 FP8 group scales。同 LSA 分支在代码中常命名为 NVLink 路径，实际可达性依据 LSA/P2P 条件判断。[`sendToken` 与接收寻址][ep-device]
+
+**这里没有 `[expert,rank,C,H]` 的按专家暂存区。** 一个消息可以同时服务目标 rank 上的多个专家，所以 native 暂存先按来源 rank 存消息，再在接收处理中按 header 展开专家路由。
+
+对每个来源 rank `r`，消息 slot 的有效范围是 `[0,n_r)`；各 rank 的容量分区之间可以存在空槽。这时只有某个 expert 的总 counter，还不能拿来描述这个传输暂存区的有效位置。
+
+#### 2.3.4 接收与 compact：native dispatch 直接写出专家连续前缀
+
+SGLang 预先分配 `recv_tokens[L,M,H]`，BF16、row-major，stride 为 `(M·H,H,1)`。native LL 接收 kernel 遍历收到的消息及其 top-k 项；对本 rank 上的每条专家路由，执行以下操作：
+
+```text
+e = 目标 global expert 在本 rank 的 local expert 编号
+原子执行以下读改写（两步整体不可分割）：
+    s = expert_counters[e]          # 取更新前的值，作为本 token 的行号
+    expert_counters[e] = s + 1      # 将加 1 后的值写回共享 counter
+q = e*M + s
+recv_tokens[e,s,:] = 收到的消息 payload
+source_info 中记录：这个消息的第 k 条路由对应展平专家行 q
+```
+
+所有来源 rank 给同一个 expert 写数据时，共用 `expert_counters[e]` 这个分配器。因此该 expert 的 s 连续取值 `0,1,...,count[e]-1`，不会为每个来源 rank 留 C 行间隔；具体 token 顺序取决于原子分配次序。[`atomicAdd(outCnt + localExpertIdx, 1)` 与 `copyRecvTokenData`][ep-device]
+
+这一步同时完成 **路由展开、数据搬运、专家内部 compact 和反向映射记录**。它由 NCCL EP native CUDA 接收 kernel 完成。SGLang 的 `dispatch_a` 提交 SEND；`dispatch_b` 调用 `complete()` 提交 RECV，后续量化按 stream 依赖消费结果。[两阶段调用][s-dispatch]、[native 接收分支][ep-device]
+
+用 `W=2,C=2`、同一个 expert 从两个 rank 各收一个 token 的例子：
+
+```text
+传输暂存的 payload 逻辑视图：
+  source rank 0: [A, 空]
+  source rank 1: [B, 空]
+
+native 接收 kernel 搬运后：
+  recv_tokens[e,:,:] = [A, B, 空, 空]   # 也可能为 [B,A,空,空]
+  expert_counters[e] = 2
+```
+
+因此，读取专家输入可以直接用 `recv_tokens[e,0:count[e],:]`。你提出的索引表 `[0,2,x,x]` 加 counter=2，适合保留原 buffer、通过 gather 读取有效位置的另一种实现；**此 native LL 分支选择实际搬运 payload，所以不使用这种索引表读取专家输入**。
+
+compact 的范围必须说清楚：**每个 expert 内部连续，expert 之间仍有容量 padding。** 例如两个专家的计数分别为 2、1，M=4：
+
+```text
+expert 0: [A, B, 空, 空]
+expert 1: [D, 空, 空, 空]
+
+展平行号： 0  1   2   3   4   5   6   7
+展平内容：[A, B, 空, 空, D, 空, 空, 空]
+```
+
+最终 shape 仍是 `[L,M,H]`，不会缩成 `[sum(count),H]`。即使把它 view 成 `[L,W,C,H]`，第二维也不再具有来源 rank 的语义。
+
+#### 2.3.5 FP8 与 Triton：改变数值格式，保留专家 slot 身份
+
+从 native dispatch 输出到 combine 输入，实际经历下面的存储转换：
+
+| 阶段 / 负责组件 | 数据 shape / 类型 | 有效位置与是否搬动行 |
+|---|---|---|
+| native LL 接收完成 | `recv_tokens[L,M,H]`，BF16 | 每个 expert 的前 `count[e]` 行有效；专家内部 compact 已完成 |
+| SGLang `_quantize_fp8` | FP8 `[L,M,H]`；FP32 scales `[L,M,H/128]` | 按 count 限定有效行，每行每 128 个 hidden 元素一组；保留 `(e,s)` |
+| Triton `prepare_expert_slots` | BF16 `[L·M,H]`；IDs `[L·M,1]`；weights `[L·M,1]` | 对有效行反量化并写 local expert ID；无效行写零、ID=-1；权重设为 1 |
+| 通用 `fused_experts_impl` | 按 local expert 执行 FP8 专家计算 | 内部生成专家分组与 block padding 索引，执行再量化和两次 GEMM |
+| Triton 适配返回 | BF16 `[L,M,H]` | 计算输出恢复为原 expert slot shape，供 native combine 按 q 读取 |
+
+`prepare_expert_slots` 的索引是 `e=slot//M`、`s=slot%M`，有效条件是 `s<count[e]`。它分配并遍历 `L·M` 个 slot，没有把各 expert 的有效行再拼成一个无空洞的大矩阵。内部 GEMM 的分组索引和 block padding 是计算组织，不是前面传输暂存的 compact。[Triton 适配][s-triton]、[通用专家计算][s-fused]
+
+这里 `masked_m` 就是 int32 的 `expert_counters[L]`，不是逐 slot 的 bool mask。有效条件由 counter 推导。适配中的权重 1 也不是 router 的真实 top-k 权重；真实权重仍由源 rank 上的 NCCL EP combine 使用。
+
+这个兼容路径存在“BF16 接收 → FP8 量化 → 适配时反量化为 BF16 → 通用 FP8 GEMM 再量化”的额外转换，也有容量大小的 scratch。它并不意味着量化、适配和全部辅助操作只按实际 token 总数分配或执行。[兼容路径说明与实现][s-triton]
+
+#### 2.3.6 counter、offset、source-info 分别描述什么？
+
+| 元数据 | 本路径的含义与使用方式 |
+|---|---|
+| `expert_counters[L]`，int32 | 每个 local expert 的实际路由行数，也是 native 接收端的行分配器；不是 `[L,W]` 的分来源计数 |
+| `expert_offsets[L+1]`、`recv_total[1]`，int32 | SGLang 分配并每轮清零，但这个 native LL dispatch 分支没有把它们填成 compact 前缀和/总数，专家计算也不读取它们 |
+| `expected_m` | 根据源端提交行数等信息计算的估计值，不决定有效行范围 |
+| native `source_info` | 记录每个来源 rank 的消息数量，以及消息的原 token 行号、各 top-k 项对应的展平专家行 q；用于 combine 回溯身份 |
+
+HT 的 metadata 预处理有处理 offsets/total 的代码，但不能据此认为这条 LL 路径也生成了它们。[SGLang 分配与清零][s-dispatch]、[LL 参数传递及 HT metadata 分支][ep-host]
+
+身份映射可以在本节直接写全。设消息来自源 rank r，位于该来源分区的消息 slot u，header 中的原 token 行号为 t；其 top-k 位置 k 选择了本 rank 的 expert e：
+
+```text
+源 token: (r,t)，路由位置 k
+  → 目标 rank 接收暂存中的消息 (r,u)       # 同一消息可供多个本地专家使用
+  → native 分配专家 slot (e,s)
+  → q=e*M+s，保存到 source_info
+  → 专家计算在 q 对应位置产生输出
+  → combine 读 source_info，将结果送回源 rank 的 (t,k) 返回 slot
+  → 源 rank 按 topk_weights[t,k] 加权求和，得到 combined[t,:]
+```
+
+固定 native 版本的 source-info 是 int32 表：前 W 项存每个来源 rank 的消息数，后面每个消息占 `K+1` 项。对应偏移为：
+
+```text
+b = W + (r*C+u)*(K+1)
+source_info[b]     = t
+source_info[b+1+k] = q     # 不属于当前 rank 的 top-k 项记为 -1
+```
+
+因此，不需要在 `recv_tokens` 里继续保留一个来源 rank 维，仍能将每份专家结果送回正确的 token 和 top-k 位置。若 compute 另行重排输出，就必须恢复 q 对应关系或同步修改回传映射。本路径的 Triton 适配保留这一契约。[native 身份记录与 combine][ep-device]、[Triton 返回布局][s-triton]
+
+#### 2.3.7 代入本文的容量与路由例子
+
+本文 `W=4,L=2,C=64,H=4096`，所以 `M=256`。Rank 0 的 E0 从 source rank 1、2、3 分别收到 16、31、64 条路由，合计 111；E1 只收到 rank 2 的 token 5，计数 1：
+
+```text
+expert_counters = [111,1]
+recv_tokens.shape = [2,256,4096]
+
+recv_tokens[0,  0:111, :]  # E0 的连续有效输入；来源 rank 可混排
+recv_tokens[0,111:256, :]  # 无效容量
+recv_tokens[1,    0:1, :]  # E1 的有效输入，即源 rank 2 的 token 5
+recv_tokens[1,  1:256, :]  # 无效容量
+```
+
+E1 的有效行是它自己的 s=0，展平 q=256；不是 `source_rank*C+token_row=133`。E0 内各 token 的具体 s 则不能由来源 rank 或原 token 行号预先推断。
+
+BF16 接收区分配 4 MiB，FP8 区分配 2 MiB，FP32 group scales 分配 64 KiB；Triton 适配还分配 `[512,4096]` 的 BF16 中间区，占 4 MiB，另有路由索引和 GEMM scratch。Rank 0 的有效 BF16 专家输入只有 `112×4096×2=896 KiB`。这些分配容量、有效数据量和物理通信量是不同的数，GEMM 的 block padding 与辅助 kernel 工作量也需另外计算。
+
+`combined` 的底层容量为 `[C,H]`，本轮返回 `[:T_r]`，恢复源端 token-major。Rank 0 虽然计算了 112 条专家路由，但本地原始 token 数为 0，最终本地 combine 输出仍是 `[0,H]`；它的专家结果已回传给其他源 rank。[接收和输出分配][s-dispatch]
+4 Graph executable 与分批执行如何改变对象关系？
 
 **Graph executable 是可重放的 CUDA 执行图，它引用的资源必须持续有效；子批重叠执行还要求各自使用的状态和缓冲区相互隔离。** 一次 MoE 执行需要 EP group、EP handle、输入与路由存储，以及接收和 combine 暂存区。Graph executable 会反复重放引用这些资源的设备工作，因此不能在捕获后就释放它们。
 
@@ -272,10 +401,9 @@ Capture 时，两个子批在相关 stream 上提交的设备工作及依赖共�
 
 销毁按依赖逆序进行：停止提交并完成在途工作，退役依赖资源的 Graph executable，再释放 EP handle、EP group 和相关存储。重建时产生新 generation，旧 Graph executable 不能继续引用新旧混杂的状态。
 
-**本层自检：**rank 0 的输出 shape 是 `[0,H]`，为什么仍需要接收区、EP handle 和专家权重？因为本地输出归属和远端专家服务是两条独立关系。
+**本层自检**：rank 0 的输出 shape 是 `[0,H]`，为什么仍需要接收区、EP handle 和专家权重？因为本地输出归属和远端专家服务是两条独立关系。
 
 <a id="level-3"></a>
-
 ## Level 3｜动态数据流：一次调用如何走完？
 
 **本层结论：把 API、对象和 buffer 接成执行链，才能知道某个函数返回后下一步究竟可以做什么。**
@@ -332,9 +460,9 @@ protocol primitives + 已建立的 transport
 
 设每个 rank 输入 N 字节，P=8。理想等分 Ring 每个 rank 的单向发送 payload 是：
 
-\[
+$$
 B_{send}=2\frac{P-1}{P}N=1.75N.
-\]
+$$
 
 | 每 rank 输入 | 每块大小 | 每 rank 发送 payload | 每 rank 接收 payload |
 |---|---:|---:|---:|
@@ -447,273 +575,321 @@ E1、E6 的接收区可能还残留上一轮的数据，但本轮 counter 已经
 
 <a id="level-4"></a>
 
-## Level 4｜执行机制：关键局部如何落实为硬件工作？
+## Level 4｜执行机制：从设备工作下钻到物理传输
 
-**本层结论：设备端的索引、同步和资源分配共同实现上层契约。以下剖析以源码中可见的局部为单位，不把 PR 描述替代为指令级证据。**
+Ring AllReduce 把每个 rank 的输入逐段归约，再把完整结果传播给所有参与者。设备端通过 primitive 执行这些动作：协议控制数据何时可读、暂存何时可复用，连接提供跨设备访问所需的资源，SM、互联和 NIC 共同完成计算与传输。[^ch4-evidence]
 
-本层 EP 内部结论均指 `nccl-extensions@e57f0dad43dc` 的 LL expert-major BF16 路径；与 SGLang 的连接依据是输入输出和调用契约。普通 NCCL 使用独立固定的 2.30.7 源码。NCCL 的 `Simple/LL/LL128` 是协议族，EP 的 `LOW_LATENCY` 是 EP 算法模式，两者名字中的 LL 不能用于推断实现相同。
+### 4.1 架构分层
 
-### 4.1 AllReduce：算法、分块与协议怎样成为 kernel？
+架构分层：
 
-#### 结论：一个 collective 被拆成可流水的工作，归约可以与搬运融合
-
-四个维度共同描述同一次通信：algorithm 决定参与者交换与归约的组织；protocol 决定 payload 和同步状态如何推进；transport 决定连接通过什么机制实现；channel 用于划分并行通信工作。它们分别回答不同问题，channel 也不是 CUDA stream。
-
-#### 源码与索引：`runRing` 的五类 primitive
-
-`runRing` 从 `ncclCollCbdPart` 取得当前 channel 的起点、元素数和 chunk 大小。一个循环处理 `P·chunkCount` 个元素，尾部按剩余量重新计算 chunk，并进行必要对齐。以逻辑 ring index `i` 表示当前参与者，其动作可概括为以下教学伪代码：
-
-```text
-发送 chunk(i-1)
-对 chunk(i-2), ..., chunk(i-(P-1))：接收 + 本地归约 + 转发
-对 chunk(i)：接收 + 最后一次归约 + 保存 + 转发
-对后续完整 chunk：接收 + 保存 + 转发
-对最后一块：接收 + 保存
+```mermaid
+flowchart TD
+    K["Device kernel"] --> A["算法实现：如 runRing"]
+    A --> P["nccl::primitive：收发、归约、保存"]
+    P --> Q["nccl::protocol：SIMPLE／LL／LL128"]
+    Q --> T["nccl::transport：P2P／SHM／NET"]
+    T --> H["物理路径：NVLink／PCIe／NIC 与网络"]
 ```
 
-对应源码中的 `directSend`、`directRecvReduceDirectSend`、`directRecvReduceCopyDirectSend`、`directRecvCopyDirectSend`、`directRecv`。中间 primitive 同时具有数据搬运和数值计算责任，因此不能把通信 kernel 的所有耗时都算作链路搬运。Primitive 名称中的 `direct` 也不足以证明数据一定绕过某个暂存区；还要看实际协议 specialization 与连接 flags。[Ring kernel][n-ring]
+| 层次 | 职责 |
+|---|---|
+| Device kernel 与算法实现 | 根据工作参数确定数据范围和交换顺序 |
+| `nccl::primitive` | 组合接收、归约、保存和发送动作 |
+| `nccl::protocol` | 管理数据编码、就绪状态和暂存复用 |
+| `nccl::transport` | 建立连接、提供访问资源并推进传输 |
+| 物理执行 | SM 执行访存与归约，互联和 NIC 承载跨设备传输 |
+| 跨层对象 `nccl::channel` | 组织并行工作所需的拓扑与连接资源 |
 
-其中结束归约阶段的实际调用是：
+### 4.2 工作怎样进入设备执行
+
+`nccl::runRing` 从 `nccl::channel` 取得通信邻居，从 `nccl::work` 取得本次处理的数据范围，然后逐块执行 Ring 操作。拓扑决定与谁交换，工作参数决定交换哪些元素。[^ch4-names]
+
+#### 对象与任务
+
+`nccl::communicator` 组织一组参与者的通信资源，其中的 `nccl::channel` 保存各并行通路的拓扑和连接状态。对 Ring 而言，`nccl::topology::ring` 给出参与者顺序、前驱和后继；相应的 `nccl::connection` 提供访问 peer 所需的指针与协议状态。
+
+这些资源可以供多次 collective 使用。每次执行时，`nccl::work` 关联本轮用户数据与执行参数，把具体任务分配到已有 channel。用户数据范围随 work 改变，通信资源则可以继续复用。
+
+对象关系：
+
+```mermaid
+flowchart TD
+    C["nccl::communicator"] -->|组织| H["nccl::channel"]
+    H -->|拓扑状态| R["nccl::topology::ring"]
+    H -->|peer 与连接| N["nccl::connection"]
+    W["nccl::work"] -.->|分配工作| H
+    W -.->|引用| U["用户输入／输出 storage"]
+```
+
+#### 数据区间与处理块
+
+一个 work 分配给某个 channel 的数据区间称为 `nccl::work::channel_partition`。`ncclCollCbdPart` 提供这个区间的起点、元素数和分块参数，供 `runRing` 计算当前访问位置。[Ring 源码][n-ring]
+
+| 字段 | 含义 | 单位 |
+|---|---|---|
+| `nccl::work::channel_partition::offset` | 区间相对用户输入／输出基址的起点 | 元素 |
+| `nccl::work::channel_partition::count` | 区间内的有效元素总数 | 元素 |
+| `nccl::work::channel_partition::chunkCount` | 常规处理块的大小 | 元素 |
+
+`runRing` 将这个区间分轮处理，每轮包含 P 个 `nccl::channel::chunk`，P 为参与者数（rank数）。每个处理块沿 Ring 完成归约和传播，随后外循环进入下一段数据。
+
+例如，八个 rank 执行 FP32 AllReduce，某次分配的参数为 `offset=4096`、`count=16384`、`chunkCount=1024`。该分配覆盖用户元素 `[4096,20480)`。每轮处理 `8×1024=8192` 个元素，两轮完成整个区间：
+
+| 轮次 | 区间内偏移 g | 本轮用户元素区间 | 本轮 j=0 的处理块 | 本轮 j=3 的处理块 |
+|---|---:|---|---|---|
+| 第一轮 | 0 | `[4096,12288)` | `[4096,5120)` | `[7168,8192)` |
+| 第二轮 | 8192 | `[12288,20480)` | `[12288,13312)` | `[15360,16384)` |
+
+设区间起点为 `base`，当前轮处理块大小为 `c`，块索引为 `j`，则访问位置满足：
+
+```text
+用户元素偏移 = base + g + j*c
+有效元素数 = max(0, min(c, count - g - j*c))
+```
+
+当剩余元素不足一整轮时，`runRing` 会缩小并对齐当前轮的处理块，再用有效元素数约束访问。`chunkCount` 决定常规分块粒度，剩余量决定尾轮实际工作量。
+
+#### runRing 的执行
+
+每轮分块确定后，`runRing` 根据当前参与者的 Ring 索引选择处理块，并调用对应的 primitive。拓扑、数据区间和局部操作在这里汇合。
+
+调用关系：
+
+```mermaid
+flowchart TD
+    K["Device kernel 的 Ring 入口"] --> R["nccl::runRing"]
+    R -.->|读取| T["channel 的拓扑／连接状态"]
+    R -.->|读取| W["本次 work 的分块参数"]
+    R --> L["确定当前处理块与有效元素数"]
+    L --> P["nccl::primitive 调用序列"]
+```
+
+`src/device/all_reduce.h` 中的 `runRing` 将这段执行组织写成外循环和一组 primitive 调用。外循环推进用户数据位置，循环内的调用序列完成该轮全部处理块的交换与归约。[设备执行入口][n-ring]
+
+### 4.3 Primitive：执行什么动作
+
+`nccl::primitive` 将收发与本地计算合成一次局部操作。Ring 的归约阶段使用“接收、归约、转发”，传播阶段使用“接收、保存、转发”；完成归约的那次调用同时保存结果并启动传播，将两个阶段接起来。
+
+#### Ring 的调用序列
+
+在一轮外循环中，令 `i` 为当前参与者在 `nccl::topology::ring` 中的索引，`j` 为当前 `nccl::channel::chunk` 的索引。下表中的块索引均按 P 取模：
+
+| 顺序 | 处理块 j | 方法 | 动作 |
+|---|---|---|---|
+| 首次发送 | `i−1` | `directSend` | 读取本地输入，发给后继 |
+| 中间归约，P−2 次 | `i−2` 到 `i−(P−1)` | `directRecvReduceDirectSend` | 接收部分结果，加入本地输入，再发给后继 |
+| 完成归约 | `i` | `directRecvReduceCopyDirectSend` | 加入最后一份输入，保存完整结果并转发 |
+| 中间传播，P−2 次 | `i−1` 到 `i−(P−2)` | `directRecvCopyDirectSend` | 接收完整结果，保存并转发 |
+| 最后接收 | `i+1` | `directRecv` | 接收并保存剩余结果 |
+
+以 `P=8、i=0` 为例，归约阶段先发送 j=7，再依次处理 j=6、5、4、3、2、1，最后完成 j=0 的归约。随后保存并转发 j=7 至 j=2 的完整结果，最后接收 j=1。各 rank 同时推进自己的序列，使不同处理块沿环流动。[Ring 调用序列][n-ring]
+
+这些方法在设备执行中组合使用。归约和转发可以在同一段数据处理过程中衔接，减少把局部动作拆成独立 kernel 所需的提交和中间数据处理。
+
+#### 一次融合归约
+
+完成归约的调用为：
 
 ```cpp
 prims.directRecvReduceCopyDirectSend(offset, offset, nelem, /*postOp=*/true);
 ```
 
-两个 offset 分别连接本地输入与输出位置，`nelem` 限定当前块的有效元素；`postOp` 让需要最终处理的归约规则在完整归约处执行。该调用同时衔接保存结果与传播结果。
-
-#### 内存与同步：经典 LL 的一条 line
-
-`prims_ll.h` 的接收局部读取四个 32-bit 字段：
+两个 `offset` 分别相对本地输入和输出基址寻址，`nelem` 给出有效元素数，`postOp` 启用完整归约后的最终处理。对 FP32 SUM，这次操作的数据关系可以写成：
 
 ```text
-data₀ | flag₀ | data₁ | flag₁
- 4 B     4 B     4 B     4 B
+received = 从前驱收到的部分和
+local = input[offset : offset + nelem]
+full = received + local
+output[offset : offset + nelem] = full
+向后继发送 full
 ```
 
-可见的 PTX 形式是 `ld.volatile.global.v4.u32`；接收线程持续读取，直到两项 flag 都等于本 step 的期望值，再拼出 64-bit payload。发送使用对应向量化 store。单条 line 的 16 B 中有 8 B payload，这是该结构的编码开销，不是整条链路实际利用率，更不是 EP LL 的传输效率。[LL primitive][n-ll]
+线程取得自己负责的接收数据和本地输入，在寄存器中形成归约结果，再衔接输出写入与发送。保存和转发使用同一份完整结果，因此这一调用同时结束当前块的 ReduceScatter 并开始其 AllGather 传播。
 
-FIFO 地址由 `step % NCCL_STEPS` 选择；发送侧通过 head/credit 判断是否有可复用位置，接收后推进 head。仅保证“此次数据写到另一块地址”不够：绕回时还必须避免覆盖尚未消费的旧 step。Flag 的循环与清理也属于协议正确性。
+继续使用 4.2 的第一轮参数，i=0 完成归约的块为 j=0，对应用户元素 `[4096,5120)`。前文的输入设定使 rank 1 至 7 提供的部分和为 35；rank 0 加入本地值 1，得到 36，写入输出并发给后继。
 
-`volatile` 保证相应访问按该指令语义发生，不能独立证明完整跨 GPU 发布协议。证据链还包括连接内存的可访问性、生产者写入、flag/credit 顺序及对应 transport 的推进。
+这次调用的动作由 primitive 确定，接收数据怎样变成可读、发送数据怎样交给下一端，则由选定的协议和连接实现。一个算法处理块还可以继续拆成协议处理单元，使交换在有限暂存空间内流水推进。
 
-#### 硬件成本与边界
+### 4.4 Protocol：怎样安全推进
 
-线程轮询会占用执行资源；编码字段、对齐与 chunk 尾部增加额外流量；增加 channel 可能增加并行供给，也会增加执行与控制成本。对 4 KiB 输入，拆得过细可能让每份有效工作太小；对 64 MiB，供给不足则可能无法维持带宽。这解释需要测什么，并不预设“channel 越多越好”。
+`nccl::protocol` 用就绪状态协调收发双方：接收方等待本轮数据可读，发送方等待暂存空间可写。前者保护消费顺序，后者限制生产速度，使有限通信缓冲能够循环使用。
 
-### 4.2 EP：怎样真实编码身份、分配 slot 并完成回传？
+#### 数据编码与接收就绪
 
-#### 结论：前向保存显式映射，回传使用原始 token 与 top-k 位置寻址
+SIMPLE、LL 和 LL128 为 primitive 提供不同的协议实现。它们的主要区别在于数据与同步状态如何组织，以及线程如何协作搬运。
 
-Native dispatch 的 expert-major 接收 slot 由原子计数分配；combine 通过 source-info 恢复原路由。我们可以把第 2 层中的抽象映射展开成具体索引。
+| 协议 | 数据与状态的组织 |
+|---|---|
+| `nccl::protocol::SIMPLE` | 按缓冲或直接访问路径搬运数据，通过进度状态协调消费和复用 |
+| `nccl::protocol::LL` | 在数据编码中携带 flag，接收线程检查对应轮次的就绪值 |
+| `nccl::protocol::LL128` | 采用自己的数据分组、标记和线程协作方式 |
 
-#### 发送：按目标 rank 去重并分配传输 slot
+经典 LL 的 `nccl::protocol::LL::line` 占 16 B，其中 8 B 为 payload，8 B 为就绪标记：
 
-发送 kernel 从 `inTopkIdx[t*K+k]` 计算目标 rank。多个选中专家若属于同一目标 rank，只让其中第一个 top-k 位置对应的 warp 发送 activation。目标端 header 仍保留完整路由，因此接收时能够展开为多个专家输入。
+| 字节范围 | 字段 | 内容 |
+|---|---|---|
+| 0–3 | `data₀` | 32-bit payload |
+| 4–7 | `flag₀` | 就绪标记 |
+| 8–11 | `data₁` | 32-bit payload |
+| 12–15 | `flag₁` | 就绪标记 |
 
-对每个目标 rank `d`，发送侧用 `atomicAdd(rankSentCnt+d,1)` 分配传输 slot `u`。这个 u 只表示当前源 rank 发给 d 的第几份消息，不能当成原 token 行号 t。源 token 行号另写在 header 里。
+接收局部通过 `ld.volatile.global.v4.u32` 读取四个字段。两个 flag 都符合当前轮次的期望值时，线程取出 64-bit payload；否则继续轮询。期望值由协议进度和 flag 编码规则产生，使接收方能够区分当前数据与槽内残留的数据。发送侧使用相应的向量化 store 写入编码数据。[LL 收发实现][n-ll]
 
-传输暂存按源 rank 分区。网络路径中每条记录为 `[header | payload | scales]`；所选版本的同 LSA 路径将 header 与 payload 分区放置。两种暂存格式最终都被转换为相同 expert-major 输出。[发送与接收实现][ep-device]
+在 FP32 路径中，一个 line 容纳两个元素。4.2 中每块 1024 个元素，共 4096 B payload，对应 512 个 line、8192 B 编码数据。这是编码容量；实际链路和内存流量还取决于事务粒度及传输路径。
 
-#### 接收：分配专家行并建立反向表
+接收轮询与发送发布共同保证数据交接。`volatile` 负责相应访存指令的访问语义，完整协议还需要满足数据写入、flag 发布和跨设备访问之间的顺序要求。
 
-用 `r` 表示源 rank、`u` 表示传输 slot、`e` 表示 local expert、`s` 表示专家接收 slot，则核心关系可写为：
+#### 发送空间与暂存复用
+
+`nccl::protocol::fifo` 为连接提供有限的暂存槽位，`nccl::protocol::step` 记录协议进度。当前进度通过 `step % NCCL_STEPS` 选择槽号，完整访问地址再由 FIFO 基址、每槽跨度和槽内位置组成。
+
+槽号会循环，生产与消费进度必须持续区分不同轮次。设 FIFO 有 S 个槽，发送方即将写入序号 s，接收方已释放的连续前缀长度为 c，则可写条件为：
 
 ```text
-s = 原子递增 expert_counter[e] 所返回的旧值
-q = e * (W*C) + s                      # expert-major 展平行号
-b = W + (r*C + u) * (K+1)              # source-info 中该消息的起点
-source_info[b]     = header.token_id   # 原始 t
-source_info[b+1+k] = q                 # 非本地 top-k 记为 -1
-recv_flat[q,:]    = message_payload
+s - c < S
+slot = s % S
 ```
 
-这是按源码重写的索引伪代码。表的前 W 项还保存来自各源 rank 的消息数量；本地所有 source 的某个 expert 共同更新同一 counter，因此有效 expert 行形成 `[0,count[e])`。原子分配确保不重复占用行，但到达顺序不同可能改变 slot 排列。
+例如 S=8、s=8、c=0 时，发送方再次指向槽 0，但第 0 份数据尚未释放，必须等待。接收方消费完该数据并把 c 推进到 1，发送方才获得一个可复用槽位。这就是 credit 所表示的空间约束。
 
-对应的两条实际源码语句位于 warp lane 0 的分配分支：
+LL 发送侧通过 head／credit 条件等待空间，接收侧消费后更新进度。数据 flag 负责接收就绪，消费进度负责释放空间，两者共同维持循环缓冲的正确性。[等待与进度实现][n-ll]
 
-```cpp
-recvTokenBeginIdx = atomicAdd(outCnt + localExpertIdx, 1);
-recvSrcTopkInfo[topkIdx] = outDataOffset + recvTokenBeginIdx;
+#### 用户数据位置与协议进度
+
+同一 FIFO 槽会先后服务不同用户数据区间。用户元素位置决定搬运内容，协议进度决定当前使用的暂存和就绪状态，两套坐标通过本次 primitive 操作关联。
+
+| 坐标 | 示例 | 含义 |
+|---|---|---|
+| 用户元素偏移 | 4096 | 相对用户基址的位置 |
+| `nccl::work::channel_partition` | `[4096,20480)` | 本次分配给 channel 的数据区间 |
+| `nccl::channel::chunk` | `[4096,5120)` | 当前算法处理块 |
+| `nccl::protocol::fifo` 槽号 | `s % NCCL_STEPS` | 当前使用的协议暂存位置 |
+| `nccl::topology::ring` 索引 | i=0 | 参与者在逻辑环中的位置 |
+
+前文算法的一轮邻居交换对应 `ring_model::step`；一次交换可以包含多个协议处理单元，因此 `nccl::protocol::step` 有自己的推进速度。接收方释放协议槽后，暂存可以复用；写入用户输出的结果则继续由后续计算消费，其使用期由执行依赖保护。
+
+### 4.5 Transport：怎样实现连接
+
+`nccl::transport` 为收发双方建立可访问的资源，并组织必要的传输推进。连接准备好后，primitive 使用既有指针和状态执行工作，网络路径还需要请求提交与完成处理，使 GPU 的生产、网络传输和接收消费衔接起来。
+
+#### 连接资源
+
+连接建立时，需要确定 peer 的访问方式，准备通信缓冲和同步状态，并在网络路径中完成所需的内存注册。设备执行由此取得本次收发所依赖的地址和连接信息。
+
+| 传输机制 | 连接资源 | 数据访问方式 |
+|---|---|---|
+| `nccl::transport::P2P` | 同机 GPU 之间的 peer 访问与同步资源 | GPU 通过 peer 地址访问数据 |
+| `nccl::transport::SHM` | 进程间共享主机内存及相关暂存 | GPU 访问或复制路径与主机暂存协作 |
+| `nccl::transport::NET` | 网络插件连接、通信缓冲和内存注册 | 网络请求驱动 NIC 传输，完成后与 GPU 接收协议交接 |
+
+P2P 的实际互联可以是 NVLink 或 PCIe。NET 使用 GPUDirect RDMA 时，NIC 直接访问满足注册和访问条件的 GPU memory；其他路径可能经主机内存中转。
+
+连接提供访问能力，协议状态给出本轮访问时机。例如，接收指针可以在多次 collective 中保持不变，而每一轮只有在相应就绪条件成立后才允许消费。指针与进度共同定义了有效的接收操作。
+
+#### 网络推进
+
+在需要 CPU proxy 的 NET 路径中，GPU 生成可发送的数据，proxy 按协议条件提交网络请求、检查完成并协调进度。NIC 承担载荷搬运，接收方再按完成和可见性条件放行 GPU 消费。
+
+| 交接 | 条件 |
+|---|---|
+| GPU producer → 发送推进方 | 待发送数据已按协议就绪 |
+| 发送推进方 → 网络插件／NIC | 地址、长度、注册和目标连接有效 |
+| 网络完成 → GPU receiver | 接收协议所需的完成与可见性条件已满足 |
+| GPU receiver → 后续计算 | 输出写入完成，消费者依赖已建立 |
+
+这条执行路径中，GPU 访问通信资源与 proxy 推进网络工作可以同时进行。对上层 Ring 算法，局部动作仍是从前驱接收、加入本地输入、向后继发送；连接机制负责将动作落实到所选路径。
+
+EP 的 Device API 提供另一种请求发起方式：设备代码构造 `ncclGin`，通过 `net.put` 指定源窗口、目标窗口、偏移和长度，再用通知组织接收。其网络推进方式由 `nccl::gin::backend` 决定，仍可能需要 CPU proxy。[EP 传输实现][ep-device]、[Device API][n-device-doc]
+
+### 4.6 物理执行：谁真正搬运字节
+
+Ring 的每条逻辑边最终对应具体的访存和传输路径。同机交换由 GPU 发起 peer 访问，经 PCIe 或 NVLink 到达对端；跨机交换增加 NIC 与网络传输。SM 同时执行输入读取、归约、输出写入和协议等待，因此通信既消耗链路带宽，也占用 GPU 执行资源。
+
+#### 同机 P2P 路径
+
+逻辑上的 A 向 B 发送，可以由 A 写入 B 的内存，也可以由 B 读取 A 的内存。两者的数据方向相同，访存请求的发起方不同：
+
+| 访问方式 | 请求发起方 | 数据方向 |
+|---|---|---|
+| A 对 B 的 peer 地址执行 store | GPU A | A → B |
+| B 对 A 的 peer 地址执行 load | GPU B | A → B |
+
+采用哪种方式由协议实现、连接配置和实际访问指针决定。对于写对端内存的路径，源线程读取或生成发送数据，向 peer 地址执行 store；互联承载该访问，目标线程在接收条件满足后读取数据。
+
+数据路径与协议依赖：
+
+```mermaid
+flowchart TD
+    A["源 GPU：读取／归约"] --> S["对 peer 地址执行 store"]
+    S --> F["PCIe 或 NVLink"]
+    F --> D["目标 GPU 内存系统"]
+    D --> R["目标线程：读取并处理"]
+    P["协议状态"] -.->|限制复用| S
+    P -.->|放行消费| R
 ```
 
-同一 warp 的其他 warp lane 随后通过 shuffle 获得这个 slot，协作复制 hidden 维数据。原子操作分配行，shuffle 传播分配结果，二者承担的职责不同。
+在 `directRecvReduceCopyDirectSend` 中，线程需要取得接收数据、读取本地输入、执行加法，再把结果用于保存和转发。加法在 SM 上执行，访存经过 GPU 内存系统，跨设备部分经过实际互联。这些操作共同构成通信 kernel 的执行时间。
 
-对 token `(2,5)`，rank 0 保存 top-k 位置 0 的展平行 `256+s₁`，rank 3 保存位置 1 的行 `s₆`。必须读取 source-info 才能知道实际 s；此前常见的猜测 `s=r*C+t` 不符合这里的 expert-major 分配方式。
-
-#### Combine：临时区恢复 top-k 位置，再做数值合成
-
-Combine send 读取 source-info，取得专家输出展平行 q、原 token t 和 top-k 位置 k。BF16、无额外 combine 量化的固定源码分支按下式选择返回暂存位置：
-
-\[
-\text{return byte offset}=(tK+k)\,B_{slot}.
-\]
-
-这个版本的 NONE recipe 保留 metadata 尾部，因此 `B_slot=2H+4·H/128`，H=4096 时为 8320 B；它不是只包含 8192 B activation 的数学向量长度。是否每条物理路径发送全部尾部，仍应继续看实际 send 的字节数，不能用 slot stride 代替传输计数。[combine 寻址与 slot 格式][ep-device]
-
-token 5 的两份结果对应 slot 10、11，其字节起点为 83,200 和 91,520。接收阶段的 TMA load warp 将所需数据搬入 shared memory；reduction warps 读取原始 `topkWeights[5,k]`，以 FP32 累加，再写目标 dtype。权重在这里生效，专家计算适配中的占位权重 1 不会再次改变它。
-
-这也解释了为什么输出必须与输入专家 slot 对齐：若 compute 为了提高 GEMM 效率重排了行，就必须在回传前恢复这一对应，或同时更新 combine 使用的映射。
-
-#### 分阶段通信的完成与 Graph executable 的动态状态
-
-Host `continue_fn` 只在提交/capture 时发挥作用。Graph executable 的 replay 重放捕获的 SEND/RECV kernel，不重新调用 Python `complete()`。在本 native 快照中，`ncclEpUpdateHandle` 的 LL 分支更新并持有路由 descriptor，而 dispatch kernel 每轮读取其数据指针里的路由值、重新生成计数和 source-info。
-
-设备侧 `LowLatencyEpochState` 保存 `epoch/pending_epoch/send_in_flight`；bank 由 `epoch & 1` 决定。SEND-only 记录 pending epoch，RECV-only 取回它并推进 epoch；双 bank 提供跨阶段的存储组织。因而这里的动态路由和 bank 推进都有设备工作依据，不只依赖“地址固定”这一事实。[EP handle 更新与 continuation][ep-host]、[epoch 与设备映射][ep-device]
-
-双 bank 不授权两个事务任意并发。该实现的一个 pending 状态、复用的 counter 和 EP group 的 workspace 仍施加序列化条件；TBO 要额外提供独立 EP lane 资源。
-
-#### 成本与适用范围
-
-前向原子分配、header 解析、payload 打包和从传输区到 expert-major 区的复制都有代价。发送按 rank 去重可能减少 activation 的物理重复，但专家计算关系仍有 K 份。本节公式只适用于选定的 LL expert-major 实现，不能移植到 rank-major 或 HT 后继续使用。
-
-### 4.3 物理传输：谁发起、谁搬运、谁消费？
-
-#### 结论：地址可访问、数据发布和消费者可读是三件要分别证明的事
-
-先分配 GPU memory，再通过注册、窗口和 peer 映射建立远端访问能力，最后由协议及执行依赖保证内容有效。分配成功不代表 NIC 已可访问；获得 peer pointer 也不代表本轮数据已经到达。
-
-#### 同 LSA 路径
-
-`ncclGetP2pPtr` 检查目标是否属于本设备的 **LSA（load/store accessible）team**，然后从窗口取得 peer pointer。发送 warp 可以通过该地址执行 payload store；接收方经过同步后读取暂存区并打包到专家布局。
-
-```text
-源 SM：读取 activation → 发出 peer memory store
-    → 实际 NVLink / PCIe 路由
-    → 目标设备内存地址
-    → 接收 kernel：等待发布条件 → 读取与布局转换
-```
-
-源码里的 `isNvlinkSrc`、`kNvlinkOnly` 等名称不能取代物理拓扑证据：这里判断的关键条件是 LSA team 成员关系。对于 SM120 的 PCIe peer-access 部署，应按实际 PCIe 路径分析，而不是因为变量名中出现 NVLink 就画出 NVLink 链路。[peer pointer 与分支][ep-device]
-
-完成通知也不只是“写一个 bool”。发送侧通过本地完成计数汇聚 payload 工作，再对 peer 计数执行 system-scope release store，编码为 `-(n+1)`；接收端 acquire load 等待非零并恢复 n。n=0 时仍有非零通知，所以零 payload 也能表达“这一来源已经交代完毕”。
-
-这条实际通知语句展示了编码和发布操作如何结合：
+EP 的同 LSA 路径中，`ncclGetP2pPtr` 返回 peer 窗口指针，发送 warp 通过该指针写 payload。发送侧汇聚数据工作后，以 system-scope release 发布完成计数，接收侧通过 acquire 读取通知：[EP peer 访问与通知][ep-device]
 
 ```cpp
 st_release_sys_global(reinterpret_cast<int*>(dstP2pPtr), -numTokensSent - 1);
 ```
 
-#### 跨 LSA / 网络路径
+计数编码为 `-(n+1)`，所以 n=0 时仍能发布非零通知，表示这一来源已完成本阶段。接收方据此区分“没有有效 payload”与“尚未完成发送”。
 
-选定 EP 代码对网络路径构造 `ncclGin`，用 `net.put` 提交源窗口、目标窗口、偏移与字节数。GPU 发起请求，NIC 执行网络数据搬运，目标 kernel 消费接收内存。GPUDirect RDMA 条件成立时，payload 可直接在 GPU memory 与 NIC 间流动。
+#### 跨机 NET 路径
 
-```text
-源 GPU 暂存区 → 源 NIC → 网络 → 目标 NIC → 目标 GPU 暂存区
-       ↑ GPU 提交与协议推进              ↓ signal / 接收 / expert packing
+前文八 rank 分布在两台服务器，`3→4` 和 `7→0` 是跨机边。以 GPUDirect RDMA 路径为例，NIC 从源 GPU 的通信内存取得数据，经网络送达目标 NIC，再写入目标 GPU 的接收内存。接收线程在协议条件满足后继续归约或保存。
+
+GPUDirect RDMA 数据路径与控制依赖：
+
+```mermaid
+flowchart TD
+    G["源 GPU 通信内存"] --> N["源 NIC"]
+    N --> F["网络"]
+    F --> M["目标 NIC"]
+    M --> H["目标 GPU 接收内存"]
+    H --> C["GPU 接收线程"]
+    P["请求与完成推进"] -.-> N
+    P -.-> M
+    V["协议与可见性交接"] -.-> C
 ```
 
-Payload put 本身不逐条发完成 signal；该实现随后按通信 context 发送携带 `n+1` 的通知。接收端等待这些通知，并通过 `rankArrivedCnt` 汇聚一个源 rank 的相关通道，然后消费消息。正确性依赖 GIN 的排序/完成语义以及局部 release/acquire 的衔接，不能从“出现 signal”就跳到“所有写入全局可见”。[EP 通知实现][ep-device]、[固定版本 Device API][n-device-doc]
+CPU proxy 可以负责请求和完成推进，而载荷沿 GPU memory、NIC、网络这条路径流动。当所选路径需要主机暂存时，数据还会增加 GPU 与主机之间的复制环节，相应增加带宽消耗和完成依赖。
 
-GPU 发起通信仍可能使用需要 CPU proxy 推进的 GIN backend；普通 NCCL NET 路径也可能需要 CPU proxy。具体由运行时 backend、连接和 transport 决定。Payload 不经 CPU 内存，不能推出 CPU 不参与进度。
+GPU 发起的 `net.put` 也经 NIC 和网络搬运载荷。EP 接收端等待通知并汇聚到达状态，然后消费消息；通知将网络传输的完成条件连接到设备端接收操作。[网络与通知实现][ep-device]
 
-#### 可以确定到哪一级？
+#### 资源占用与并发
 
-源码明确展示了 peer pointer、向量化 load/store、GIN put、通知和接收打包。它没有独立证明每笔事务命中哪一级 cache、落在哪个硬件队列、实际取得多少 PCIe 带宽。选定源码的接收 helper 还保留了跨 SM 一致性复核注释，因此本文把上述内容作为协议实现解读，不声称已经完成形式化一致性证明。
+通信要与计算重叠，首先需要两者的执行依赖允许并发，其次需要硬件资源能够同时容纳它们。接收轮询占用线程及驻留资源，归约使用 SM 指令和寄存器，数据搬运消耗内存系统与互联带宽。这些资源也可能被并行的 GEMM 使用。
 
-若诊断 stale data，应分别核对 payload 的发布顺序、通知作用域、接收线程之间的交接，以及消费者 stream 依赖；不能只加一个本地 barrier 就宣称跨设备正确。
+| 通信工作 | 主要资源需求 |
+|---|---|
+| 等待接收和发送空间 | 轮询线程、寄存器、驻留资源 |
+| 本地输入读取与归约 | 访存带宽、寄存器和算术指令 |
+| 输出保存与后继发送 | 内存写入、peer 访问或网络传输 |
+| 多 channel 并行 | 更多并行执行与协议状态 |
+| 网络推进 | NIC、网络带宽及所需的 proxy 执行 |
 
-### 4.4 布局与局部微架构：量化、TMA 和 shared memory 花费什么？
+增加 channel 可以提高数据供给，也会增加并行工作和控制成本。对于 4 KiB 输入，每份工作较小，额外同步更容易占据主要时间；对于 64 MiB 输入，足够的供给有助于维持链路带宽。合适的并行度取决于这两类成本的平衡。
 
-#### 结论：计算兼容性会增加内存工作，通信 kernel 自身也受片上容量约束
+片上暂存还会限制通信与计算的共驻。EP combine 的 TMA 将数据从 global memory 搬入 shared memory，三个 `nccl_ep::tma::stage` 通过 full／empty barrier 交替填充、消费和复用。每个 stage 都需要实际的 shared-memory 容量。
 
-先看 SGLang 的计算适配，再深入同一 token 返回路径的 TMA 管线。两者共同决定“通信完成后要做多少额外工作”和“通信能否与计算共存”。
+在 H=4096、BF16、NONE recipe 下，每发送 warp 的预算为 `3×(2048+16)+128=6320 B`，单接收 group 为 34016 B。取 99 KiB 动态预算，候选配置如下：[容量公式][ep-smem]、[配置选择][ep-adapter-h]
 
-#### Triton 适配：mask 保护输入，容量仍影响写出工作
+| 发送 warps | 发送阶段预算 | 是否满足 99 KiB |
+|---:|---:|---|
+| 32 | 202240 B | 否 |
+| 17 | 107440 B | 否 |
+| 16 | 101120 B | 是 |
 
-`_prepare_expert_slots` 的一个 program 处理一个展平 expert slot，反推 `expert=slot//M`、`row=slot%M`，以 `row<count[expert]` 控制输入 payload 与 scale 的 load。有效行计算 `FP8_value×scale`；无效行使用零。随后按 hidden 边界写出 BF16 整行，并写 `id=expert/-1` 与占位权重 1。[适配 kernel][s-triton]
+动态预算取发送与接收阶段需求的较大者，这组参数下由发送阶段决定。按附录 A 的 SM120 每 SM 128 KiB shared-memory 上限，101120 B 的 block 最多驻留一个；剩余容量还要满足并行计算 block 的需求。减少 warp 数后仍需检查 shared memory、寄存器和线程的联合限制，才能判断是否获得了实际并发空间。
 
-实际源码中的判断与输出语句为：
+[^ch4-names]: `namespace::term` 用于区分概念，源码块保留原标识符。沿用迁移 `nccl::chunk → nccl::channel::chunk`；算法模型的整 tensor 等分片为 `ring_model::segment`，算法逻辑环为 `ring_model::ring`，实例拓扑为 `nccl::topology::ring`。图中架构箭头表示实现依托，对象图省略 peer／connector 中间结构。
 
-```python
-valid = row < tl.load(counts + expert)
-tl.store(output + slot * H + h, x * scale, mask=h < H)
-```
-
-输入 load 使用 valid，但这个输出 store 的 mask 只限制 hidden 边界。由这一差异可以直接推导无效行仍产生输出写入。
-
-因此，对本例 rank 0：有效输入只有 112 行，但 adapter 的 grid 仍有 `2×256=512` 个 programs，输出区仍写 512 行。H=4096 时，仅 BF16 中间区的逻辑 store 量就有 4 MiB。这里能从源码推导逻辑访问量；不能据此断定 DRAM 实际流量正好也是 4 MiB，因为 cache 和写事务会影响计数。
-
-完整格式链为：
-
-```text
-BF16 wire
-  → BF16 expert-major recv
-  → FP8 + group scales（接收后量化）
-  → BF16 flattened slots（Triton 兼容适配）
-  → 通用 FP8 专家计算所需的输入量化与计算
-  → BF16 expert outputs
-  → BF16 combine
-```
-
-这条兼容路径有额外读写和量化误差来源。`filter_expert=True` 能让后续执行过滤无效专家 ID，但不抹去 adapter 已执行的容量级写入；它也不意味着每个无效 slot 必然执行完整 GEMM。应按各 kernel 分别计账。
-
-#### LL combine 的 TMA 管线
-
-在选定 native 快照中，combine 使用三阶段 shared-memory buffer。发送侧用异步 bulk global-to-shared copy 预取专家输出；接收侧由专门 load warp 把回传数据搬入 shared memory，reduction warps 等待 full barrier 后按权重累加，再通知 empty barrier 使该 stage 可复用。
-
-```text
-stage 0: TMA 填充 → full → reduction 消费 → empty
-stage 1:      TMA 填充 → full → reduction 消费 → empty
-stage 2:           TMA 填充 → full → reduction 消费 → empty
-         stage index 循环；barrier phase 区分相邻轮次
-```
-
-`device_primitives.cuh` 直接给出 `cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes.L2::cache_hint` 与 `mbarrier.arrive.expect_tx`、parity wait 等 PTX 形式。前者是局部 global-to-shared 传输，不能因为 TMA 出现就认定 TMA 负责跨节点网络发送。Barrier 的 transaction bytes 与期望 phase 必须对应，才能防止读取未填满的数据或重复使用上一轮完成状态。[设备指令封装][ep-primitives]、[combine kernel][ep-device]
-
-下面用同一场景的 H=4096、BF16、NONE combine recipe，计算实际源码中的 shared memory 预算。[容量公式][ep-smem]、[配置选择][ep-adapter-h]
-
-1. 每个 `int4` 装 8 个 BF16；发送 unroll=4，接收 unroll=2。
-2. 发送每 warp 每阶段 payload 为 `32×16×4=2048 B`；barrier/padding 为 16 B；每 warp metadata 预算为 `4096/128×4=128 B`。
-3. 发送每 warp 总预算为 `3×(2048+16)+128=6320 B`。
-4. 接收 decode warps 为 `(4096/8)/(32×2)=8`；加一个 load warp，每个接收 group 至少 9 warps。
-5. 单接收 group 的预算是 `3×(16+16+8192)+8192+3×128×3=34016 B`。
-
-动态 shared memory 取发送、接收阶段预算的较大者，而非相加。假设传给 selector 的可用动态预算为 **99 KiB=101376 B**，一个 warp group 初始请求 32 warps，则：
-
-| warps/block | 发送预算 | 可用接收 groups | 动态预算是否满足 |
-|---:|---:|---:|---|
-| 32 | 202240 B | 2 | 超过 101376 B |
-| 17 | 107440 B | 1 | 仍然超过 |
-| 16 | 101120 B | 1 | 满足；接收预算 34016 B 更小 |
-
-`choose_combine_smem_config` 保留 warp group 到专家的映射，逐步减少每组 warps，直到找到可行配置。此处将选择 16 warps。**这是指定预算下的源码算术，不是本文实测的 launch 参数。** 实际上限还要取设备查询值、static shared memory 和 kernel 属性允许值。
-
-若按附录中的 SM120 每 SM 128 KiB shared memory 上限估算，101120 B 的 block 仅从 shared memory 就限制为每 SM 最多一个；16 resident warps 相对 48-warp 上限约为 33.3%。这个 occupancy 上限不等于“只能达到三分之一性能”：该 kernel 可能由传输延迟、同步或带宽决定，更多 resident warps也未必有收益。
-
-这段剖析把“减少通信资源给 compute 腾空间”变成了具体问题：虽然 warp 数减少，单 block 仍占用大量 shared memory，某个 GEMM block 未必能与它同驻一个 SM。能否共存需要联合检查两者的寄存器、shared memory、线程和调度条件。
-
-### 4.5 CUDA Graph、SBO/TBO：执行组织如何改变资源需求？
-
-#### 结论：并行 stream 表达了可能的并发，实际重叠还受依赖、block 驻留和全局资源约束
-
-先看 SGLang 的两个关键依赖。`NcclEpStream.send` 让通信 stream 等待当前 producer stream，并把输入 storage 记录为被通信 stream 使用；`complete` 在通信 stream 提交 RECV，再让 consumer stream 等待通信 stream。中间的独立 shared 工作不被加入通信 stream 的新前置依赖。[stream 实现][s-stream]
-
-从两个方法各取一条实际依赖语句：
-
-```python
-self.stream.wait_stream(producer)   # send 中，建立 producer → communication
-consumer.wait_stream(self.stream)   # complete 中，建立 communication → consumer
-```
-
-注释为本文添加。依赖应按记录时点解释，不能把第一条等待扩大成通信 stream 永久等待 producer stream 的所有未来工作。
-
-TBO 为两个子批分别使用一个 EP lane。每个 EP lane 独立持有通信 stream、EP group、EP handle、路由、接收和 combine 暂存。计算使用独立 stream 还要求 attention 子对象和 workspace 可隔离；本快照对 attention TP、dense TP 和 allocator 支持作了限制，不能从“两个 EP group 已独立”推出完整模型计算都能并发。[TBO 增量](https://github.com/Laceprndpm/sglang/commit/a705747b5b8280ccfbddce9bbcb125721fc29878)
-
-#### 逻辑分工不是硬件分区
-
-EP kernel 中名为 `smId` 的变量来自 `blockIdx.x`，`numSms` 来自 `gridDim.x`。它们用于工作划分，并非读取物理 SM ID，也不表示将某几个 SM 永久划给通信。
-
-SGLang `_resolve_max_num_sms` 默认传入 20，并根据专家数量检查下界。这个参数是 launch 组织的输入，最终 grid/block 仍由 native adapter 计算。对本文 E=8 的 dispatch，按所选 adapter 的公式，在 `numDeviceSms=20` 时 warp groups=1、warps/block=32、grid=8 blocks，而不是“固定占用 20 个物理 SM”。[SGLang 参数][s-dispatch]、[native launch 计算][ep-adapter]
-
-在 SM120 上，一个 32-warp dispatch block 仅按 48-warp 上限就不能与另一个同样大的 block 同驻；能否与更小 compute block 共存，还受寄存器等约束。Combine 又可能受上一节的 shared memory 预算限制。即使 blocks 能共存，仍会竞争 DRAM、L2、PCIe/NVLink、NIC 或其他公共通路。
-
-#### Graph executable 保存什么，不能省去什么？
-
-Graph executable 保存工作及依赖，降低部分 host 提交成本；它不会省去捕获进来的量化、adapter、clone 或通知工作。变更路由要靠 replay 内的 copy 和 dispatch 读取更新；变更 bucket descriptor 在 warmup 阶段处理，不能指望 replay 再运行 Python update。
-
-增加 EP lane 还增加持久 scratch 和通信资源；CUDA Graph 路径下重复输出 clone 则使不同逻辑输出有独立生存期。若为节省内存删除它，应先证明其最后消费者总早于下一次覆盖，而不是只证明本次 combine 完成。
-
-**本层自检：**能否从 H=4096 的具体公式解释 shared memory 限制，从 source-info 解释身份恢复，从通知链解释数据就绪？这些是可推导机制；真实 kernel 时长、缓存命中和端到端收益仍需测量。
+[^ch4-evidence]: 本章沿用 NCCL 2.30.7 与 EP `e57f0dad43dc` 的原文依据。分块参数、FIFO 不变量和 shared-memory 预算为数值推演；协议细节重点展开 LL。此次修订为文字与结构整理，未新增远端源码核验或 GPU 测试。
 
 <a id="level-5"></a>
 
@@ -780,10 +956,10 @@ Rank 0 不发送有效本地 activation，但仍要执行对端所期待的阶�
 
 对理想均质 ring，可先用下式理解权重：
 
-\[
+$$
 T\approx T_{submit}+2(P-1)\alpha+
 \frac{2(P-1)N}{PB_{effective}}.
-\]
+$$
 
 `α` 是一步的固定通信/同步成本，`B_effective` 是该模型下的有效传输速率。这是解释模型，真实跨节点 ring 有不同链路、流水和 channel，不能用一个 B 拟合后宣称找到了物理瓶颈。
 
@@ -837,10 +1013,10 @@ Combine 在本场景的每条路由也返回 H 个 BF16 值，上表可作为它
 
 将一批拆成两批后，不能假设 `2·G(T/2)=G(T)`。每专家收到的行数变化、tile padding、较小 GEMM、两套 metadata 与更多阶段都会影响成本。可以写成：
 
-\[
+$$
 \Delta T\approx \Delta T_{shape}+\Delta T_{prepare}+
 \Delta T_{sync}+\Delta T_{contention}-T_{hidden}.
-\]
+$$
 
 各项用于组织解释，不应在发生重叠时重复计时。最有区分力的三组对照是：**未拆批串行、拆批但串行、拆批并重叠**。前两组隔离拆批代价，后两组隔离并行组织带来的净收益；三组保持总有效 token、路由、精度和输出要求一致。
 
