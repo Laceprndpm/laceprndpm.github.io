@@ -33,7 +33,7 @@ mathjax: true
 
 以 MNIST 为例，持续加噪会让不同数字的笔画逐渐消失，最后都接近高斯噪声。生成时从一份新噪声开始，模型逐步形成图像结构。学习的目标是让生成结果符合**数字图像的分布**，并不需要为这份新噪声找回一张唯一的原图。
 
-![正向扰动与反向生成](assets/basic-diffusion/mean-intuition.png)
+![正向扰动与反向生成](mean-intuition.png)
 
 上排是一张图片的加噪过程；下排是模型从另一份噪声开始生成的轨迹。每一步都根据当前状态和时间做预测，然后由采样器计算下一步状态。
 
@@ -93,7 +93,7 @@ $\theta$ 表示网络参数；$\mathbb E$ 表示对不同图片、时间和噪�
 
 下面的小型 U-Net 用来展示结构，输入和输出都是 `[B,1,28,28]`。时间编码告诉网络当前有多嘈杂；下采样提取更大范围的特征，跳跃连接把高分辨率信息交给上采样路径。
 
-![时间条件 U-Net](assets/basic-diffusion/mnist-unet.png)
+![时间条件 U-Net](mnist-unet.png)
 
 `time_embedding` 将每张图的时间编码成 64 维向量，通常使用不同频率的 sin/cos 编码和线性层。下面保留条件注入与特征连接的定义，省略该通用编码模块的实现。
 
@@ -319,7 +319,7 @@ U-Net 中的 cross-attention 以图像特征产生 query，以文本表示产生
 
 实际模型还约定了 latent 的缩放方式，读入和解码时都要遵守对应配置。空间位置从 $512^2$ 减到 $64^2$，减少了 64 倍，但端到端速度还受通道数、骨干、文本处理和 VAE 成本影响。
 
-![潜空间与骨干网络属于不同的设计维度](assets/basic-diffusion/latent-dit.png)
+![潜空间与骨干网络属于不同的设计维度](latent-dit.png)
 
 ## 6．DiT：把去噪骨干换成 Transformer
 
@@ -378,7 +378,7 @@ $$
 
 随着 $\tau$ 增大，噪声比例下降、图像比例上升。对于这对端点，整段位移就是每单位时间的目标速度。训练网络 $v_\theta(x_\tau,\tau)$，用平方误差拟合这个速度即可。
 
-![DDPM 与本文 Flow Matching 的时间方向及混合系数](assets/basic-diffusion/mean-flow-time.png)
+![DDPM 与本文 Flow Matching 的时间方向及混合系数](mean-flow-time.png)
 
 左图以固定 $\beta=0.01$ 为例，右图是本节的线性插值。训练监督直接由图片与噪声构造，不需要先运行一遍生成过程。[Flow Matching][fm]
 

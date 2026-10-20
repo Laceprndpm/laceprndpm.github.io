@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "sync": "sh rsync.sh",
     "build": "hexo generate",
     "clean": "hexo clean",
     "deploy": "hexo deploy",

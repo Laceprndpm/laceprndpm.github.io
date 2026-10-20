@@ -1,3 +1,5 @@
-rsync -av --delete \
-  /home/patchouli/Voile/AI/AI-Infra-note/* \
-  ~/Projects/blog/source/_posts/
+#!/bin/sh
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec python3 "$project_dir/tools/sync_posts.py" "$@"
