@@ -101,6 +101,10 @@ ignore:
 ## Themes: https://hexo.io/themes/
 theme: keep
 
+mathjax:
+  packages:
+    - ams
+
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
