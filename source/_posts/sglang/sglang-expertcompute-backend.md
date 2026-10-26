@@ -89,15 +89,15 @@ $$
 
 Level 1 给出了共同的数学目标；不同后端在分组计算、硬件优化和低精度实现上各有侧重。下面概览 SGLang 的主要 NVIDIA 专家计算选项，名称对应 `--moe-runner-backend`。
 
-| 后端 | 实现侧重 | 典型适用场景 |
-|---|---|---|
-| **Triton**（`triton`） | 易于修改、扩展和调优的 grouped GEMM | 自定义 kernel，以及本文的小 M、BM 和拆批成本研究 |
-| **DeepGEMM**（`deep_gemm`） | 针对支持架构优化 MoE GEMM，提供 contiguous 和 masked 布局 | block-wise FP8 专家计算；分别组织 prefill 和 decode 的不同形状 |
-| **CUTLASS**（`cutlass`） | 基于 NVIDIA 模板库实现专用 GEMM | 使用对应架构、数据类型已有的 CUTLASS 实现 |
-| **FlashInfer TRT-LLM**（`flashinfer_trtllm` / `flashinfer_trtllm_routed`） | 推理专用 MoE；routed 变体消费框架算好的 top-k IDs 和权重 | 使用 TRT-LLM MoE 实现的推理部署 |
-| **FlashInfer CUTLASS**（`flashinfer_cutlass`） | 经 FlashInfer 接入 CUTLASS grouped GEMM 与 MoE 实现 | 支持的 FP8/FP4 模型 |
-| **FlashInfer MXFP4**（`flashinfer_mxfp4`） | 针对 MXFP4 格式的低精度计算 | MXFP4 量化模型 |
-| **FlashInfer CuTe DSL**（`flashinfer_cutedsl`） | 基于 CuTe DSL 的 MoE kernel，接入 ModelOpt FP4 | 支持的 NVFP4 量化模型 |
+| 后端                                                                       | 实现侧重                                          | 典型适用场景                                          |
+| ------------------------------------------------------------------------ | --------------------------------------------- | ----------------------------------------------- |
+| **Triton**（`triton`）                                                     | 易于修改、扩展和调优的 grouped GEMM                      | 自定义 kernel，以及本文的小 M、BM 和拆批成本研究                  |
+| **DeepGEMM**（`deep_gemm`）                                                | 针对支持架构优化 MoE GEMM，提供 contiguous 和 masked 布局   | block-wise FP8 专家计算；分别组织 prefill 和 decode 的不同形状 |
+| **CUTLASS**（`cutlass`）                                                   | 基于 NVIDIA 模板库实现专用 GEMM                        | 使用对应架构、数据类型已有的 CUTLASS 实现                       |
+| **FlashInfer TRT-LLM**（`flashinfer_trtllm` / `flashinfer_trtllm_routed`） | 推理专用 MoE；routed 变体消费框架算好的 top-k IDs 和权重       | 使用 TRT-LLM MoE 实现的推理部署                          |
+| **FlashInfer CUTLASS**（`flashinfer_cutlass`）                             | 经 FlashInfer 接入 CUTLASS grouped GEMM 与 MoE 实现 | 支持的 FP8/FP4 模型                                  |
+| **FlashInfer MXFP4**（`flashinfer_mxfp4`）                                 | 针对 MXFP4 格式的低精度计算                             | MXFP4 量化模型                                      |
+| **FlashInfer CuTe DSL**（`flashinfer_cutedsl`）                            | 基于 CuTe DSL 的 MoE kernel，接入 ModelOpt FP4      | 支持的 NVFP4 量化模型                                  |
 
 这张表用于定位，后续只展开 Triton；具体支持组合以版本为准。
 

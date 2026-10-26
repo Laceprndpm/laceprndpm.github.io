@@ -101,7 +101,7 @@ flowchart LR
 
 ### 1.2 专家分布到不同 GPU 后，增加什么工作？
 
-**Expert Parallelism（EP）**把专家集合分给一组执行参与者。本文先采用常见的一进程一 GPU 映射，每个 rank 拥有两个完整专家。Rank 是它在某个通信组内的编号；同一 GPU 在另一组中的编号可能不同。
+**Expert Parallelism（EP）** 把专家集合分给一组执行参与者。本文先采用常见的一进程一 GPU 映射，每个 rank 拥有两个完整专家。Rank 是它在某个通信组内的编号；同一 GPU 在另一组中的编号可能不同。
 
 源 rank 拥有 token，并不意味着它拥有该 token 选中的专家。Rank 2 拥有 E4、E5，但 token 5 要去 E1、E6，因此执行需要三件事：
 

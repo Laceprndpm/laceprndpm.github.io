@@ -1,0 +1,167 @@
+{
+  "environment": {
+    "python": "3.11.15",
+    "torch": "2.5.1",
+    "device": "cpu",
+    "reference_dtype": "torch.float64"
+  },
+  "hand_calculation": {
+    "gradients": {
+      "W1": [
+        [
+          3.0,
+          -4.0,
+          0.0
+        ],
+        [
+          6.0,
+          -8.0,
+          0.0
+        ]
+      ],
+      "b1": [
+        3.0,
+        -4.0,
+        0.0
+      ],
+      "W2": [
+        [
+          3.0,
+          -6.0
+        ],
+        [
+          1.0,
+          -2.0
+        ],
+        [
+          0.0,
+          0.0
+        ]
+      ],
+      "b2": [
+        1.0,
+        -2.0
+      ]
+    },
+    "input_gradient": [
+      [
+        7.0,
+        -1.0
+      ]
+    ],
+    "loss_before": 2.5,
+    "loss_after_sgd": 0.9601224999999994,
+    "finite_difference_max_abs_error": 4.935998276778264e-10
+  },
+  "accumulation": {
+    "microbatch_sizes": [
+      1,
+      2
+    ],
+    "correct_normalization_matches": true,
+    "wrong_mean_of_means_max_gradient_error": 0.583333333333333,
+    "adam_parameters_and_states_match": true
+  },
+  "adam": {
+    "two_step_trace": [
+      {
+        "step": 1,
+        "gradient_W2_0": 3.0,
+        "m": 0.29999999999999993,
+        "v": 0.009000000000000008,
+        "m_hat": 3.0,
+        "v_hat": 9.0,
+        "weight_W2_0": 0.9900000000333333,
+        "loss_after_step": 2.0929000010682817
+      },
+      {
+        "step": 2,
+        "gradient_W2_0": 2.4568000017181517,
+        "m": 0.515680000171815,
+        "v": 0.015026866248442322,
+        "m_hat": 2.714105264062185,
+        "v_hat": 7.517191720081303,
+        "weight_W2_0": 0.9801008279844404,
+        "loss_after_step": 1.733135605573986
+      }
+    ],
+    "reset_optimizer_weight_difference": 0.0003022007738080479
+  },
+  "adamw": {
+    "weight_before": 1.0,
+    "weight_after_zero_gradient_step": 0.999
+  },
+  "precision": {
+    "rounding_traces": {
+      "torch.float16": [
+        {
+          "step": 1,
+          "low_only": 1.0,
+          "main_fp32": 0.9998999834060669,
+          "model_from_main": 1.0
+        },
+        {
+          "step": 2,
+          "low_only": 1.0,
+          "main_fp32": 0.9997999668121338,
+          "model_from_main": 1.0
+        },
+        {
+          "step": 3,
+          "low_only": 1.0,
+          "main_fp32": 0.9996999502182007,
+          "model_from_main": 0.99951171875
+        },
+        {
+          "step": 10,
+          "low_only": 1.0,
+          "main_fp32": 0.998999834060669,
+          "model_from_main": 0.9990234375
+        },
+        {
+          "step": 20,
+          "low_only": 1.0,
+          "main_fp32": 0.9979996681213379,
+          "model_from_main": 0.998046875
+        }
+      ],
+      "torch.bfloat16": [
+        {
+          "step": 1,
+          "low_only": 1.0,
+          "main_fp32": 0.9998999834060669,
+          "model_from_main": 1.0
+        },
+        {
+          "step": 2,
+          "low_only": 1.0,
+          "main_fp32": 0.9997999668121338,
+          "model_from_main": 1.0
+        },
+        {
+          "step": 3,
+          "low_only": 1.0,
+          "main_fp32": 0.9996999502182007,
+          "model_from_main": 1.0
+        },
+        {
+          "step": 10,
+          "low_only": 1.0,
+          "main_fp32": 0.998999834060669,
+          "model_from_main": 1.0
+        },
+        {
+          "step": 20,
+          "low_only": 1.0,
+          "main_fp32": 0.9979996681213379,
+          "model_from_main": 0.99609375
+        }
+      ]
+    },
+    "tiny_gradient": {
+      "without_scaling": 0.0,
+      "scaled_then_unscaled": 1.0011717677116394e-08
+    }
+  },
+  "status": "PASS"
+}
