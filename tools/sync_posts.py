@@ -112,10 +112,14 @@ def sync_posts(source, destination):
         raise ValueError(f"Not a notes directory containing Markdown: {source}")
     if source.is_relative_to(destination) or destination.is_relative_to(source):
         raise ValueError("Source and destination must not overlap.")
+    rsync_options = ["rsync", "-a", "--exclude=.*"]
+    exclusions = Path(__file__).resolve().parents[1] / "sync-excludes.txt"
+    if exclusions.is_file():
+        rsync_options.extend(["--exclude-from", str(exclusions)])
     with tempfile.TemporaryDirectory(prefix="blog-post-sync-") as temporary:
         snapshot = Path(temporary)
         subprocess.run(
-            ["rsync", "-a", "--exclude=.*", f"{source}/", f"{snapshot}/"],
+            rsync_options + [f"{source}/", f"{snapshot}/"],
             check=True,
         )
         if any(path.is_symlink() for path in snapshot.rglob("*")):
