@@ -25,22 +25,24 @@ mathjax: true
 
 ## 目录
 
-- [1. LLVM 优化全链路](#1-llvm-优化全链路)
-- [2. LLVM IR 核心计算模型](#2-llvm-ir-核心计算模型)
-- [3. 常见 Analysis](#3-常见-analysis)
-- [4. 常见优化与实现手段](#4-常见优化与实现手段)
-- [5. 如何定位优化发生或失败](#5-如何定位优化发生或失败)
-- [6. LLVM Pass 的结构与契约](#6-llvm-pass-的结构与契约)
-- [7. Backend、MIR 与性能解释](#7-backendmir-与性能解释)
-- [8. Clang、opt、llc 常用命令](#8-clangoptllc-常用命令)
-- [9. 案例一：Alias、restrict 与并行归约](#9-案例一aliasrestrict-与并行归约)
-- [10. 案例二：MMO、调度 DAG 与启发式失配](#10-案例二mmo调度-dag-与启发式失配)
-- [11. 通用排查清单](#11-通用排查清单)
-- [12. 一句话术语表](#12-一句话术语表)
-- [13. 可迁移的方法与未解问题](#13-可迁移的方法与未解问题)
-- [14. 参考与复现材料](#14-参考与复现材料)
+- [1. LLVM 优化全链路](#llvm-pipeline)
+- [2. LLVM IR 核心计算模型](#llvm-ir)
+- [3. 常见 Analysis](#llvm-analysis)
+- [4. 常见优化与实现手段](#llvm-transformations)
+- [5. 如何定位优化发生或失败](#llvm-diagnosis)
+- [6. LLVM Pass 的结构与契约](#llvm-pass-contracts)
+- [7. Backend、MIR 与性能解释](#llvm-backend)
+- [8. Clang、opt、llc 常用命令](#llvm-tools)
+- [9. 案例一：Alias、restrict 与并行归约](#llvm-alias-case)
+- [10. 案例二：MMO、调度 DAG 与启发式失配](#llvm-scheduling-case)
+- [11. 通用排查清单](#llvm-checklist)
+- [12. 一句话术语表](#llvm-glossary)
+- [13. 可迁移的方法与未解问题](#llvm-takeaways)
+- [14. 参考与复现材料](#llvm-references)
 
 ---
+
+<a id="llvm-pipeline"></a>
 
 # 1. LLVM 优化全链路
 
@@ -99,6 +101,8 @@ Executable / Shared Library
 4. 最终性能在哪层被验证？
 
 ---
+
+<a id="llvm-ir"></a>
 
 # 2. LLVM IR 核心计算模型
 
@@ -190,6 +194,8 @@ LLVM verifier主要检查类型、SSA支配、Phi、CFG和属性放置等 IR 结
 
 ---
 
+<a id="llvm-analysis"></a>
+
 # 3. 常见 Analysis
 
 Analysis提供事实，Transformation消费事实。Analysis通常不是固定处于“Loop前或后”的一次性 Pass；关键是消费者在什么 IR 状态下查询它。
@@ -262,6 +268,8 @@ Transformation修改 IR 后：
 错误地保留失效分析可能导致后续 Pass 使用陈旧事实。
 
 ---
+
+<a id="llvm-transformations"></a>
 
 # 4. 常见优化与实现手段
 
@@ -360,6 +368,8 @@ Inlining既能暴露优化，也会增加代码尺寸和寄存器压力。
 
 ---
 
+<a id="llvm-diagnosis"></a>
+
 # 5. 如何定位优化发生或失败
 
 ## 5.1 四分法
@@ -426,6 +436,8 @@ Inlining既能暴露优化，也会增加代码尺寸和寄存器压力。
 没有任何单一工具能同时回答“是否 MayAlias”和“它是否就是本次优化失败原因”。需要 Analysis结果和消费方决策两类证据。
 
 ---
+
+<a id="llvm-pass-contracts"></a>
 
 # 6. LLVM Pass 的结构与契约
 
@@ -508,6 +520,8 @@ return PreservedAnalyses::none(); // 修改可能使所有分析失效
 Options不是都必须显式设置；未设置项使用默认策略。包装 `LoopUnrollPass` 的价值是复用LLVM维护的CFG、Phi、LCSSA和余数循环变换，而不是手工复制块。
 
 ---
+
+<a id="llvm-backend"></a>
 
 # 7. Backend、MIR 与性能解释
 
@@ -616,6 +630,8 @@ ISA通常定义指令功能和架构状态，不统一规定每条指令的cycle
 Preload通常优先在pre-RA调度考虑：此时既能看到目标指令和MMO，又有足够重排空间。IR层负责提供独立性，post-RA更多做有限修整。
 
 ---
+
+<a id="llvm-tools"></a>
 
 # 8. Clang、opt、llc 常用命令
 
@@ -752,6 +768,8 @@ llvm-mca -mtriple=riscv64 \
 
 ---
 
+<a id="llvm-alias-case"></a>
+
 # 9. 案例一：Alias、restrict 与并行归约
 
 ## 9.1 `const&`不表示底层对象immutable
@@ -846,6 +864,8 @@ IR观察两次load/归约链
 ```
 
 ---
+
+<a id="llvm-scheduling-case"></a>
 
 # 10. 案例二：MMO、调度 DAG 与启发式失配
 
@@ -961,6 +981,8 @@ correctness：max diff = 0
 
 ---
 
+<a id="llvm-checklist"></a>
+
 # 11. 通用排查清单
 
 ## 11.1 Middle-end
@@ -995,6 +1017,8 @@ correctness：max diff = 0
 - [ ] 是否把“允许优化”和“实际提速”分开？
 
 ---
+
+<a id="llvm-glossary"></a>
 
 # 12. 一句话术语表
 
@@ -1041,6 +1065,8 @@ correctness：max diff = 0
 | Strict Aliasing | 源语言限制哪些类型的lvalue可以合法访问同一对象，前端常用TBAA编码。 |
 
 ---
+
+<a id="llvm-takeaways"></a>
 
 # 13. 可迁移的方法与未解问题
 
@@ -1093,6 +1119,8 @@ Simulator/Hardware说明“它实际上是否更快”
 ```
 
 ---
+
+<a id="llvm-references"></a>
 
 # 14. 参考与复现材料
 

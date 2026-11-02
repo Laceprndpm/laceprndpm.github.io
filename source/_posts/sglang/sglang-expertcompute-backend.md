@@ -506,7 +506,7 @@ expert 1：旧 q=128..139 → 紧凑行 70..81
 
 **条件与代价。** 映射必须覆盖重复专家路由、空专家和动态 counts；代价是前缀和、pack、restore 及相应 scratch。有效率本来很高时，减少的无效处理可能抵不过新增搬运。它也没有减少每个专家按 BM 对齐的有效 tile 数。
 
-**实现状态。** 原始兼容 PR 没有这项 compact；历史 v5 候选有。它把全容量 slot 展开缩小为 `min(L·R, R·top-k)` 的固定行上界，仍不是只处理有效 counts。历史实际形状中的 1536 行要在该版本下解释，不能套到本文 256 行教学算例上。[历史容量分析][local-diagnosis]
+**实现状态。** 原始兼容 PR 没有这项 compact；历史 v5 候选有。它把全容量 slot 展开缩小为 `min(L·R, R·top-k)` 的固定行上界，仍不是只处理有效 counts。历史实际形状中的 1536 行要在该版本下解释，不能套到本文 256 行教学算例上。
 
 ### 4.2 Tight-capacity：让每个微批使用更紧的安全上界
 
@@ -518,7 +518,7 @@ expert 1：旧 q=128..139 → 紧凑行 70..81
 
 **条件与代价。** 所有层的 shape、路由上界和固定地址复用必须一致；不能只依据均衡路由的平均值分配。更细的容量档位会增加资源与 Graph 管理复杂度，调度不满足前提时仍需保守容量。
 
-**实现状态。** 历史 v6 在限定的统一 decode Graph 配置中尝试过 `P × padded lane tokens × top-k`，eager 仍采用原容量。这是有条件的候选，不是通用的“所有 buffer 除以二”。[v6 范围][local-v6]
+**实现状态。** 历史 v6 在限定的统一 decode Graph 配置中尝试过 `P × padded lane tokens × top-k`，eager 仍采用原容量。这是有条件的候选，不是通用的“所有 buffer 除以二”。
 
 ### 4.3 调 BM：少空算与更多任务之间的交换
 
@@ -537,7 +537,7 @@ expert 1：旧 q=128..139 → 紧凑行 70..81
 
 **条件与代价。** 两次 GEMM 必须共享一致的 BM/alignment；检查数值正确性及最终 BN/BK/warps/stages。此源码在 SM90 的特定小 BM 配置上还会启用 `swap_ab`，所以实验变量只改 BM，并不保证编译策略完全相同。更小 BM 也不保证 Tensor Core 利用、访存或总延迟更好。[配置约束][s-config]、[kernel 分支][s-kernel]
 
-**实现状态。** 默认回退 BM64 已有；历史 v6 试过 BM16/32，且同时包含容量优化，不能把整组改善归给 BM。新的 sweep 应固定 adapter 版本，再改变 BM。[历史候选][local-v6]
+**实现状态。** 默认回退 BM64 已有；历史 v6 试过 BM16/32，且同时包含容量优化，不能把整组改善归给 BM。新的 sweep 应固定 adapter 版本，再改变 BM。
 
 ### 4.4 少做一次格式往返：移除重复量化，或融合必要转换
 
@@ -584,7 +584,7 @@ TBO 下还需考虑另一条计算/通信 stream：单 kernel 独占时最优的
 
 历史旧 trace 的 B32 样本中，每次 replay 的 routed GEMM 调用数从 52 增至 104；每次 replay 的这类 kernel 总耗时中位数由约 5.981 ms 增至 10.826 ms，按该聚合折算的单次耗时约为 115.0→104.1 μs。它证明了该采样条件下的现象，尚不能单独证明某个专家的 tile 数完全没变。
 
-这份 trace 使用旧的未 compact 适配器，且存在 Nsight 告警。后来的 v5 使用 compact adapter、不同采集条件，不能用旧 kernel 时间替代新版本各项时间。[历史归因报告][local-diagnosis]
+这份 trace 使用旧的未 compact 适配器，且存在 Nsight 告警。后来的 v5 使用 compact adapter、不同采集条件，不能用旧 kernel 时间替代新版本各项时间。
 
 同一轮 v5 无 profiler、1024 请求、C256 的服务数据是：
 
@@ -594,7 +594,7 @@ TBO 下还需考虑另一条计算/通信 stream：单 kernel 独占时最优的
 | 双微批顺序执行 | 1396.29 | 5078.98 ms | 153.67 ms |
 | TBO | 1427.38 | 5299.88 ms | 150.78 ms |
 
-TBO 相对顺序拆批的吞吐提升约 2.23%，相对不拆批仍下降约 34.25%。这些请求使用自然 EOS，实际输出、路由与批次轨迹不完全相同；它是部署表现对照，不是严格等工作量的算子实验。[原始汇总][local-summary]
+TBO 相对顺序拆批的吞吐提升约 2.23%，相对不拆批仍下降约 34.25%。这些请求使用自然 EOS，实际输出、路由与批次轨迹不完全相同；它是部署表现对照，不是严格等工作量的算子实验。
 
 基于这些事实，下一步应提出能被测量否定的成本假设，而不是直接归因为“CUDA Graph 固定了 grid”或“GPU 利用率低”。
 
@@ -656,7 +656,7 @@ $$
 
 ### 5.5 为什么下一轮固定客户端 C64？
 
-这是已选定的实验点，不是普遍最优值。v5 中，不拆批平均 TTFT 从 C64 的约 299 ms 增至 C256 的约 2672 ms，顺序拆批从约 551 ms 增至 5079 ms。提高并发虽然增加在途工作，也付出了首 token 等待代价。[汇总数据][local-summary]
+这是已选定的实验点，不是普遍最优值。v5 中，不拆批平均 TTFT 从 C64 的约 299 ms 增至 C256 的约 2672 ms，顺序拆批从约 551 ms 增至 5079 ms。提高并发虽然增加在途工作，也付出了首 token 等待代价。
 
 客户端 C64 不等于每 rank 的 Graph B64，更不等于每专家 64 行。历史模型有 64 个 routed experts、top-k=6；若全局恰有 64 个有效 decode token 且均衡分配，整批每 expert 平均只有 6 行，等分微批平均为 3 行。这是工作量估算，不是实际 counts。
 
@@ -721,10 +721,6 @@ PR 的结论应落在明确条件内：哪套 GPU、模型、adapter 和负载�
 [s-align]: https://github.com/Laceprndpm/sglang/blob/491a30820f6c4a65094eb97ae12604766b2f7847/python/sglang/srt/layers/moe/moe_runner/triton_utils/moe_align_block_size.py
 [s-rank]: https://github.com/sgl-project/sglang/blob/e1f7de17a521dd607e1bec62081f26121cf5c6cc/python/sglang/srt/layers/moe/token_dispatcher/nccl_ep.py
 [cuda-graph]: https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html
-[local-diagnosis]: /home/patchouli/work/docs/profile-v5-c256/Diagnosis.md
-[local-v5]: /home/patchouli/work/docs/profile-v5-c256/README.md
-[local-v6]: /home/patchouli/work/docs/profile-v6-microbatch/README.md
-[local-summary]: /home/patchouli/work/docs/profile-v5-c256/summary.json
 
 [backend-overview]: https://docs.sglang.io/docs/advanced_features/expert_parallelism#backends-for-moe-computation
 
