@@ -26,6 +26,6 @@
     "hexo-server": "^3.0.0",
     "hexo-theme-landscape": "^1.0.0",
     "htmlparser2": "10.1.0",
-    "js-yaml": "4.3.2"
+    "js-yaml": "5.5.0"
   }
 }
