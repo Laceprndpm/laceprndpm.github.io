@@ -1,0 +1,917 @@
+{
+  "status": "PASS",
+  "environment": {
+    "python": "3.11.15",
+    "torch": "2.5.1",
+    "backend": "gloo",
+    "device": "cpu",
+    "dtype": "torch.float64"
+  },
+  "configuration": {
+    "world_size": 8,
+    "microbatch_size_per_rank": 2,
+    "microbatches_per_step": 4,
+    "global_batch_size": 64,
+    "optimizer_steps": 3,
+    "max_gradient_norm": 0.25
+  },
+  "scope": "Actual CPU DDP and educational ReduceScatter/sharded-Adam/AllGather, not GPU or framework ZeRO execution.",
+  "ranks": [
+    {
+      "rank": 0,
+      "sample_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 3,
+        "first_step_first_parameter_local_gradient": 1.012375,
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 3.469446951953614e-18,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 1,
+      "sample_ids": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 3,
+        "first_step_first_parameter_local_gradient": 1.3831250000000002,
+        "max_gradient_abs_error": 2.220446049250313e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 2,
+      "sample_ids": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 3,
+        "first_step_first_parameter_local_gradient": 2.241375,
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 3,
+      "sample_ids": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 3,
+        "first_step_first_parameter_local_gradient": 1.6986249999999998,
+        "max_gradient_abs_error": 2.220446049250313e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 3.469446951953614e-18,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 4,
+      "sample_ids": [
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 3,
+        "first_step_first_parameter_local_gradient": 1.0370000000000001,
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 3.469446951953614e-18,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 5,
+      "sample_ids": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 2,
+        "first_step_first_parameter_local_gradient": 2.0095000000000005,
+        "max_gradient_abs_error": 2.220446049250313e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 1.734723475976807e-18,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 6,
+      "sample_ids": [
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 0,
+        "first_step_first_parameter_local_gradient": 1.9067499999999997,
+        "max_gradient_abs_error": 0.0,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 0.0,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    },
+    {
+      "rank": 7,
+      "sample_ids": [
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "ddp_sync_each_microbatch": {
+        "max_gradient_abs_error": 6.661338147750939e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 12,
+        "gradient_elements_presented_to_collectives": 204,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.645478734464649,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "ddp_sync_last_microbatch": {
+        "max_gradient_abs_error": 4.440892098500626e-16,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 6.938893903907228e-18,
+        "gradient_allreduce_calls": 3,
+        "gradient_elements_presented_to_collectives": 51,
+        "trace": [
+          {
+            "step": 1,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.64547873446465,
+            "reference_loss_before_step": 1.6213984375000001
+          },
+          {
+            "step": 2,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 4.35793520918726,
+            "reference_loss_before_step": 1.4426094765099269
+          },
+          {
+            "step": 3,
+            "cumulative_gradient_collectives_by_microbatch": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "global_gradient_norm": 3.8156381082654685,
+            "reference_loss_before_step": 1.291905566820453
+          }
+        ]
+      },
+      "educational_sharded_adam": {
+        "parameter_count": 17,
+        "padded_parameter_count": 24,
+        "valid_owned_elements": 0,
+        "first_step_first_parameter_local_gradient": 1.29675,
+        "max_gradient_abs_error": 0.0,
+        "max_parameter_abs_error": 3.469446951953614e-18,
+        "max_adam_state_abs_error": 0.0,
+        "max_global_norm_abs_error": 8.881784197001252e-16,
+        "algorithm_collectives_per_step": {
+          "gradient_reduce_scatter": 1,
+          "norm_allreduce": 1,
+          "parameter_allgather": 1
+        }
+      }
+    }
+  ]
+}

@@ -172,6 +172,122 @@ def adamw_decay():
     return {"weight_before": 1.0, "weight_after_zero_gradient_step": p.item()}
 
 
+def optimizer_comparison():
+    x, y = tensor([[1.0, 2.0]]), tensor([[0.0, 0.0]])
+    traces = {}
+    for kind in ["sgd", "momentum", "adam"]:
+        p = new_params()
+        if kind == "sgd":
+            optimizer = torch.optim.SGD(list(p.values()), lr=0.01, foreach=False)
+        elif kind == "momentum":
+            optimizer = torch.optim.SGD(list(p.values()), lr=0.01, momentum=0.9,
+                                        dampening=0.0, nesterov=False, foreach=False)
+        else:
+            optimizer = torch.optim.Adam(list(p.values()), lr=0.01, betas=(0.9, 0.999),
+                                         eps=1e-8, foreach=False)
+        manual = {name: {"param": param.detach().clone(), "u": torch.zeros_like(param),
+                         "m": torch.zeros_like(param), "v": torch.zeros_like(param)}
+                  for name, param in p.items()}
+        rows = []
+        for step in (1, 2):
+            optimizer.zero_grad(set_to_none=True)
+            loss_fn(p, x, y).backward()
+            g = p["W2"].grad[0, 0].item()
+            old_weight = p["W2"][0, 0].item()
+            for name, param in p.items():
+                state = manual[name]
+                if kind == "sgd":
+                    direction = param.grad
+                elif kind == "momentum":
+                    state["u"] = 0.9 * state["u"] + param.grad
+                    direction = state["u"]
+                else:
+                    state["m"] = 0.9 * state["m"] + 0.1 * param.grad
+                    state["v"] = 0.999 * state["v"] + 0.001 * param.grad.square()
+                    direction = (state["m"] / (1 - 0.9**step)) / (
+                        (state["v"] / (1 - 0.999**step)).sqrt() + 1e-8)
+                state["param"] -= 0.01 * direction
+            optimizer.step()
+            for name, param in p.items():
+                close(param, manual[name]["param"])
+                if kind == "momentum":
+                    close(optimizer.state[param]["momentum_buffer"], manual[name]["u"])
+                elif kind == "adam":
+                    close(optimizer.state[param]["exp_avg"], manual[name]["m"])
+                    close(optimizer.state[param]["exp_avg_sq"], manual[name]["v"])
+            if kind == "sgd":
+                assert not optimizer.state
+            new_weight = p["W2"][0, 0].item()
+            rows.append({"step": step, "gradient_W2_0": g,
+                         "subtracted_update": old_weight - new_weight,
+                         "direction": (old_weight - new_weight) / 0.01,
+                         "weight_W2_0": new_weight,
+                         "loss_after_step": loss_fn(p, x, y).item()})
+        traces[kind] = rows
+    close(tensor(traces["momentum"][1]["gradient_W2_0"]), 0.65706)
+    close(tensor(traces["momentum"][1]["direction"]), 3.35706)
+    close(tensor(traces["momentum"][1]["weight_W2_0"]), 0.9364294)
+    return traces
+
+
+def momentum_and_rmsprop_examples():
+    parameter = tensor([1.0], True)
+    optimizer = torch.optim.SGD([parameter], lr=0.01, momentum=0.9, foreach=False)
+    reversal = []
+    for gradient in [3.0, -3.0]:
+        old_weight = parameter.detach().clone()
+        parameter.grad = tensor([gradient])
+        optimizer.step()
+        reversal.append({"gradient": gradient,
+                         "momentum_buffer": optimizer.state[parameter]["momentum_buffer"].item(),
+                         "subtracted_update": (old_weight - parameter).item()})
+    close(optimizer.state[parameter]["momentum_buffer"], [-0.3])
+
+    parameter = tensor([1.0, 1.0], True)
+    optimizer = torch.optim.RMSprop([parameter], lr=0.01, alpha=0.9, eps=1e-8,
+                                    momentum=0.0, centered=False, foreach=False)
+    expected = parameter.detach().clone()
+    average = torch.zeros_like(parameter)
+    rmsprop = []
+    for gradients in [[1.0, 10.0], [2.0, -20.0]]:
+        parameter.grad = tensor(gradients)
+        average = 0.9 * average + 0.1 * parameter.grad.square()
+        expected -= 0.01 * parameter.grad / (average.sqrt() + 1e-8)
+        optimizer.step()
+        close(parameter, expected)
+        close(optimizer.state[parameter]["square_avg"], average)
+        rmsprop.append({"gradient": gradients, "square_avg": average.tolist(),
+                        "parameter": parameter.detach().tolist()})
+    return {"momentum_reversal": reversal, "rmsprop_manual_matches": rmsprop}
+
+
+def coupled_l2_vs_adamw():
+    output = {}
+    for kind in ["adam_l2", "adamw"]:
+        parameter = tensor([1.0], True)
+        parameter.grad = tensor([0.0])
+        factory = torch.optim.Adam if kind == "adam_l2" else torch.optim.AdamW
+        optimizer = factory([parameter], lr=0.01, weight_decay=0.1,
+                            betas=(0.9, 0.999), eps=1e-8, foreach=False)
+        optimizer.step()
+        state = optimizer.state[parameter]
+        if kind == "adam_l2":
+            close(parameter, [1.0 - 0.01 * 0.1 / (0.1 + 1e-8)])
+            close(state["exp_avg"], [0.01])
+            close(state["exp_avg_sq"], [0.00001])
+        else:
+            close(parameter, [0.999])
+            close(state["exp_avg"], [0.0])
+            close(state["exp_avg_sq"], [0.0])
+        output[kind] = {"weight": parameter.item(), "m": state["exp_avg"].item(),
+                        "v": state["exp_avg_sq"].item()}
+    fixed_denominators = tensor([1.0, 10.0])
+    l2_contribution = 0.01 * 0.1 * tensor([1.0, 1.0]) / fixed_denominators
+    close(l2_contribution, [0.001, 0.0001])
+    output["fixed_denominator_l2_contribution"] = l2_contribution.tolist()
+    return output
+
+
 def master_weights():
     traces = {}
     for dtype in [torch.float16, torch.bfloat16]:
@@ -210,6 +326,9 @@ def main():
                               "device": "cpu", "reference_dtype": str(DTYPE)},
               "hand_calculation": hand_calculation(), "accumulation": accumulation(),
               "adam": adam_states(), "adamw": adamw_decay(), "precision": master_weights(),
+              "optimizer_comparison": optimizer_comparison(),
+              "momentum_and_rmsprop": momentum_and_rmsprop_examples(),
+              "coupled_l2_vs_adamw": coupled_l2_vs_adamw(),
               "status": "PASS"}
     output = json.dumps(report, indent=2, ensure_ascii=False)
     if args.json:

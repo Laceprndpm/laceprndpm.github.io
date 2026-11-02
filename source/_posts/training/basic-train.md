@@ -321,22 +321,93 @@ print(loss.item(), new_loss.item())
 
 ## 2 优化器与训练状态
 
-### 2.1 Momentum 先保留方向的历史
+这一章沿着“当前梯度 → 方向历史 → 尺度历史 → 解耦权重衰减”展开。用 $\Psi$ 表示参数总数，本例 $\Psi=17$；新增状态的存储按 FP32 计算，一个与全部参数同形状的缓冲占 $4\Psi$ 字节。
 
-SGD 每次只看当前梯度。Momentum 引入一个跨更新保存的缓冲：
+### 2.1 从无状态到有状态：为什么朴素 SGD 不够用
+
+朴素 SGD 直接使用当前梯度：
+
+$$
+g_t=\nabla_\theta L_t(\theta_{t-1}),\qquad
+\theta_t=\theta_{t-1}-\eta g_t.
+$$
+
+这里“无状态”指不额外保存跨 step 的梯度历史统计。相同的当前梯度和学习率，总会给出相同的更新量，不会考虑此前梯度是持续同向还是频繁变号。
+
+先看第 1.3 节已经算出的参数梯度：
+
+$$
+G_{W_1}=\begin{bmatrix}3&-4&0\\6&-8&0\end{bmatrix},\qquad
+G_{W_2}=\begin{bmatrix}3&-6\\1&-2\\0&0\end{bmatrix}.
+$$
+
+当 $\eta=0.01$ 时，梯度为 1 的参数移动 0.01，梯度为 $-8$ 的参数移动 0.08。不同坐标共用一个 $\eta$，更新幅度直接跟随当前梯度大小。梯度量级不同本身并不是错误；当各方向适宜的步长不同时，单一学习率需要在稳定性与前进速度之间折中。
+
+另一个问题是方向摆动。mini-batch 采样或跨过狭窄谷底，可能让某个坐标连续收到正负交替的梯度。若两步分别为 $+3$、$-3$，SGD 就先移动 $-0.03$，再移动 $+0.03$，此前的方向信息没有留下。减小学习率能缩小摆动，却也会放慢其他稳定方向上的推进。
+
+因此可以给优化器增加两类记忆：**方向历史**用于判断哪些贡献持续同向，**尺度历史**用于调整各坐标的有效步长。这是用额外显存保存信息、改善更新决策的出发点。
+
+### 2.2 第一块状态（$+4\Psi$）：Momentum 记住方向
+
+Momentum SGD 为每个参数增加历史缓冲 $u_t$：
 
 $$
 u_t=\mu u_{t-1}+g_t,\qquad
 \theta_t=\theta_{t-1}-\eta u_t.
 $$
 
-这里使用 $u_0=0$ 的基础形式，不含 dampening 或 Nesterov。持续同方向的梯度会累积；反复变号的贡献会部分抵消。从系统角度看，每个参数现在需要额外保存一个同形状的历史张量。
+采用 $u_0=0$、$\mu=0.9$，不启用 dampening 或 Nesterov。展开递推可以看到，旧梯度按时间衰减地参与当前方向：
 
-Adam 还会跟踪梯度的幅度，为不同参数坐标调整更新尺度。
+$$
+u_t=g_t+\mu g_{t-1}+\mu^2g_{t-2}+\cdots+\mu^{t-1}g_1.
+$$
 
-### 2.2 Adam 的平方项是二阶矩
+持续同向的贡献会累积，正负交替的贡献会部分抵消。沿用上一节的 $+3,-3$ 梯度序列：
 
-记第 $t$ 次更新使用的梯度为 $g_t$，从 $m_0=v_0=0$ 开始：
+$$
+u_1=3,\qquad u_2=0.9\times3-3=-0.3.
+$$
+
+第二步的反向移动因此从 SGD 的 $+0.03$ 缩小到 $+0.003$。Momentum 保留了此前的方向，不会完全随当前一次梯度转向。
+
+再回到实际 MLP，观察初始值为 1 的 $W_2[0,0]$。第一次 backward 得到 $g_1=3$，所以：
+
+$$
+u_1=3,\qquad W_2[0,0]^{(1)}=1-0.01\times3=0.97.
+$$
+
+由于初始缓冲为零，这一步对所有参数的更新与第 1.4 节的 SGD 相同。第二次重新前向得到 $H=[2.82,1.24,0]$、$\hat Y=[0.233,-1.366]$，因此该权重的新梯度为：
+
+$$
+g_2=H_1(\hat Y_1-Y_1)=2.82\times0.233=0.65706.
+$$
+
+Momentum 将它与上一轮方向合并：
+
+$$
+u_2=0.9\times3+0.65706=3.35706,
+$$
+
+$$
+W_2[0,0]^{(2)}=0.97-0.01\times3.35706=0.9364294.
+$$
+
+相比只用新梯度更新，历史缓冲使这个持续同向的坐标继续前进。PyTorch 将这份状态保存为 `momentum_buffer`；采用 FP32 时，它为全部参数增加 $4\Psi$ 字节，并在各次 step 之间保留。[SGD 与 Momentum 实现约定][sgd]
+
+### 2.3 第二块状态（$+4\Psi$）：RMSprop 感知尺度，Adam 合二为一
+
+Momentum 记住了方向，但仍没有为不同坐标单独估计梯度尺度。RMSprop 的基本思路是记录梯度平方的指数移动平均，再用其平方根归一化当前梯度：
+
+$$
+v_t=\rho v_{t-1}+(1-\rho)(g_t\odot g_t),\qquad
+\theta_t=\theta_{t-1}-\eta\frac{g_t}{\sqrt{v_t}+\epsilon}.
+$$
+
+这里采用 $v_0=0$、非中心化且不带额外动量的形式。某个坐标的历史梯度幅度大，$v_t$ 就大，对应的有效学习率 $\eta/(\sqrt{v_t}+\epsilon)$ 就小。[RMSprop][rmsprop]
+
+例如，一个坐标的整段梯度序列放大 10 倍，平方历史就放大 100 倍。忽略 $\epsilon$ 时，分子和分母同时放大 10 倍，归一化后的更新幅度保持不变。这使更新不再直接按原始梯度量级同比放大。
+
+RMSprop 单独使用时只需保存 $v_t$，也是 $4\Psi$ 字节。若同时保留方向和尺度两类历史，就得到 Adam 的两块主要状态：
 
 $$
 m_t=\beta_1m_{t-1}+(1-\beta_1)g_t,
@@ -346,9 +417,9 @@ $$
 v_t=\beta_2v_{t-1}+(1-\beta_2)(g_t\odot g_t).
 $$
 
-$m_t$ 是梯度的指数移动平均，保留符号；$v_t$ 是梯度逐元素平方的指数移动平均，即非中心二阶矩估计。
+$m_t$ 保留梯度方向，$v_t$ 记录非中心二阶矩。Adam 的 $m_t$ 使用带 $(1-\beta_1)$ 系数的 EMA 记法，与上一节未乘 $(1-\mu)$ 的 $u_t$ 约定不同。
 
-因为初始值是零，需要校正初始化带来的偏小：
+当 $m_0=v_0=0$ 时，初期历史平均会受到零初始化影响。以恒定梯度 $g$ 为例，递推得到 $m_t=(1-\beta_1^t)g$，因此 Adam 使用偏差修正：
 
 $$
 \hat m_t=\frac{m_t}{1-\beta_1^t},\qquad
@@ -360,51 +431,105 @@ $$
 \frac{\hat m_t}{\sqrt{\hat v_t}+\epsilon}.
 $$
 
-分母按历史梯度尺度调整各坐标的更新，$\epsilon$ 防止除零。“二阶”指统计矩，Adam 使用一阶梯度，不计算 Hessian。[Adam Algorithm 1][adam]
+这样，分子使用平滑后的方向，分母使用平滑后的尺度。“二阶”指梯度平方的统计矩，Adam 使用一阶梯度，不计算 Hessian。[Adam Algorithm 1][adam]
 
-### 2.3 在同一个 MLP 上追踪两次 Adam 更新
+| 方法 | 跨 step 保留的主要状态 | FP32 状态开销 |
+| --- | --- | ---: |
+| 朴素 SGD | 无梯度历史缓冲 | $0$ |
+| Momentum SGD | 方向缓冲 $u$ | $4\Psi$ |
+| 基础 RMSprop | 平方梯度平均 $v$ | $4\Psi$ |
+| Adam | 方向平均 $m$ 与平方平均 $v$ | $8\Psi$ |
 
-将模型重置到第 1.2 节的初始参数，每次使用同一个样本。设置 $\eta=0.01$、$\beta_1=0.9$、$\beta_2=0.999$、$\epsilon=10^{-8}$。选 $W_2$ 第一行第一列这个初始值为 1 的参数观察。
+因此，Adam 相对 Momentum 增加的第二块状态为 $4\Psi$ 字节。这张表只统计梯度历史缓冲，模型权重、当前梯度、主权重和小型计数器在后面的显存账本中另计。
 
-第一次 backward 得到 $g_1=3$：
+### 2.4 同一个 MLP 上对照 SGD、Momentum 与 Adam
+
+三种方法分别从第 1.2 节的同一组初始参数开始，每次使用同一个样本，更新全部参数后再重新前向和反向。统一设置 $\eta=0.01$；Momentum 使用 $\mu=0.9$，Adam 使用 $\beta_1=0.9$、$\beta_2=0.999$、$\epsilon=10^{-8}$。
+
+仍观察 $W_2[0,0]$，记本次从权重中减去的更新量为 $\delta_t$：
+
+| 优化器 | step | 当前梯度 $g_t$ | 减去的更新量 $\delta_t$ | 更新后的权重 |
+| --- | ---: | ---: | ---: | ---: |
+| SGD | 1 | 3.000000 | 0.030000000 | 0.970000000 |
+| SGD | 2 | 0.657060 | 0.006570600 | 0.963429400 |
+| Momentum | 1 | 3.000000 | 0.030000000 | 0.970000000 |
+| Momentum | 2 | 0.657060 | 0.033570600 | 0.936429400 |
+| Adam | 1 | 3.000000 | 0.010000000 | 0.990000000 |
+| Adam | 2 | 2.456800 | 0.009899172 | 0.980100828 |
+
+SGD 与 Momentum 第一步相同，所以第二步遇到的梯度也相同；区别来自 Momentum 保留了 $u_1$。Adam 第一步已经把整个模型更新到另一组参数，因此第二步梯度也随之改变。
+
+Adam 第一步有：
 
 $$
-m_1=0.3,\quad v_1=0.009,\quad
-\hat m_1=3,\quad\hat v_1=9.
+m_1=(1-\beta_1)g_1,\qquad
+v_1=(1-\beta_2)g_1^2,
 $$
 
-于是更新量约为 $0.01\times3/3=0.01$，权重变为约 $0.99$。第二次梯度由**全部参数更新后的模型重新前向和反向得到**，不能继续把原来的梯度 3 当作新梯度。
+$$
+\hat m_1=g_1,\qquad \hat v_1=g_1^2,\qquad
+\delta_1=\eta\frac{g_1}{|g_1|+\epsilon}.
+$$
 
-| 更新次数 | 当前梯度 $g_t$ | $m_t$ | $v_t$ | $\hat m_t$ | $\hat v_t$ | 更新后的权重 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 3.000000 | 0.300000 | 0.009000 | 3.000000 | 9.000000 | 0.990000 |
-| 2 | 2.456800 | 0.515680 | 0.015026866 | 2.714105 | 7.517192 | 0.980100828 |
+对非零梯度，忽略 $\epsilon$ 时就是 $\delta_1=\eta\operatorname{sign}(g_1)$：每个坐标的首次更新幅度约为 $\eta$，符号由梯度决定。零梯度对应零更新。这里的固定幅度来自零初始化后的第一次偏差修正，并不适用于一般的后续步骤。
 
-表内保留有限小数，验证脚本使用完整精度与 PyTorch Adam 对照。对于第一次更新、非零梯度且忽略 $\epsilon$ 时，$\hat m_1/\sqrt{\hat v_1}=\operatorname{sign}(g_1)$；这个简化不适用于一般的后续更新。
+第二步会混入上一轮历史。本例中：
 
-在 PyTorch 优化器中，常见状态字段对应如下：[AdamW 状态初始化][adamw-init]
+$$
+m_2\approx0.515680,\quad v_2\approx0.015026866,
+\quad\hat m_2\approx2.714105,\quad\hat v_2\approx7.517192,
+$$
 
-| 数学对象 | 代码状态 | 生命周期 |
-| --- | --- | --- |
-| $m$ | `exp_avg` | 跨多次 step 保留 |
-| $v$ | `exp_avg_sq` | 跨多次 step 保留 |
-| 更新计数 $t$ | `step` | 实际更新时推进，用于偏差校正 |
-| 当前梯度 $g$ | 参数的 `.grad` 或框架梯度 buffer | 累积完成后用于本次更新，下轮重新准备 |
+$$
+\delta_2=0.01\frac{\hat m_2}{\sqrt{\hat v_2}+10^{-8}}
+\approx0.009899172.
+$$
 
-恢复训练时，只有权重 checkpoint 不足以恢复优化器轨迹，还需要 $m/v/t$；完整续训还涉及学习率调度、随机数、数据进度和适用时的 loss scaler 状态。
+因此，相同的学习率数值在三种方法中并不对应相同的有效更新幅度。表格展示更新机制，完整的训练效果还取决于各方法的超参数与后续轨迹。
 
-### 2.4 AdamW 将权重衰减与梯度自适应处理分开
+在 PyTorch 中，Adam 的 $m/v/t$ 对应 `exp_avg`、`exp_avg_sq` 和 `step`。[AdamW 状态初始化][adamw-init] 恢复训练时，只有权重 checkpoint 不足以恢复优化器轨迹，还需要这些历史状态；完整续训还涉及学习率调度、随机数、数据进度和适用时的 loss scaler 状态。
 
-对本文的基础 AdamW 形式，可以写成：
+### 2.5 正则化与自适应的冲突：从 L2 到 AdamW
+
+L2 正则化将参数平方和加入目标函数：
+
+$$
+L_{\mathrm{reg}}(\theta)=L_{\mathrm{data}}(\theta)
++\frac{\lambda}{2}\|\theta\|_2^2,
+\qquad
+\tilde g_t=g_t+\lambda\theta_{t-1}.
+$$
+
+对于不带动量的 SGD：
+
+$$
+\theta_t=\theta_{t-1}-\eta(g_t+\lambda\theta_{t-1})
+=(1-\eta\lambda)\theta_{t-1}-\eta g_t.
+$$
+
+它等价于先将参数按 $1-\eta\lambda$ 收缩，再进行数据梯度更新。此时 L2 正则和这种乘法 weight decay 对应同一条更新式。
+
+把同样的 $\tilde g_t$ 交给 Adam，$\lambda\theta$ 就会同时进入方向历史 $m_t$ 和尺度历史 $v_t$，并通过自适应分母作用于参数。于是同一个 $\lambda$ 不再对应各坐标统一的收缩比例。[AdamW 原论文][adamw-paper]
+
+为看清分母的作用，先考察固定分母的简化更新 $\delta_i=\eta(g_i+\lambda\theta_i)/d_i$，其中 $d_i=\sqrt{\hat v_i}+\epsilon$。正则项对应的贡献为 $\eta\lambda\theta_i/d_i$。若两个坐标都是 1，$\eta=0.01$、$\lambda=0.1$，而分母分别为 1 和 10，那么对应贡献分别为 0.001 和 0.0001。**较大的历史梯度尺度会在这个固定分母比较中削弱正则项的作用；实际 Adam 中，正则项还会反过来改变 $m/v$。**
+
+AdamW 将 weight decay 从自适应梯度更新中解耦：$m/v$ 只统计数据目标的梯度 $g_t$，参数另行按统一系数衰减。
 
 $$
 \theta_t=(1-\eta\lambda)\theta_{t-1}
 -\eta\frac{\hat m_t}{\sqrt{\hat v_t}+\epsilon}.
 $$
 
-$\lambda$ 是 weight decay 系数。衰减项直接作用于参数；用于计算 $m/v$ 的仍是目标函数的梯度。若把 $\lambda\theta$ 加入梯度再交给 Adam，衰减项也会进入历史统计并被自适应缩放，通常不等价于上述解耦形式。[AdamW 更新实现][adamw-update]
+这样 $\lambda$ 直接控制参数的乘法收缩，不再经过二阶矩分母。L2 仍然是一种正则化目标，但在 Adam 下，它与解耦的 weight decay 已不是同一个操作。[AdamW 更新实现][adamw-update]
 
-例如 $\theta=1$、$\eta=0.01$、$\lambda=0.1$，初始 $m=v=0$ 且显式提供零梯度，一次 AdamW step 后参数为 $0.999$。这里“零梯度张量”有别于 `.grad is None`；常见 PyTorch 实现会跳过后者对应参数的更新。
+用一个标量检查区别：初始 $\theta=1$、$m=v=0$，数据梯度显式设为 0，取 $\eta=0.01$、$\lambda=0.1$、$\epsilon=10^{-8}$：
+
+| 方法 | 用于更新 $m/v$ 的梯度 | 一步后的参数 |
+| --- | ---: | ---: |
+| Adam 加 L2 | $0+0.1\times1=0.1$ | 约 0.990000001 |
+| AdamW | $0$ | 0.999 |
+
+前者把正则梯度也进行了 Adam 的归一化；后者只执行 $1-\eta\lambda=0.999$ 的直接收缩。这里显式的零梯度张量有别于 `.grad is None`，后者在常见 PyTorch 实现中会使对应参数跳过更新。
 
 ## 3 混合精度与主权重
 
@@ -627,7 +752,7 @@ FSDP 在 DP 组内分片训练状态。在 `FULL_SHARD` 路径中，每次前后
 python assets/basic-train/verify_basic_train.py
 ```
 
-脚本需要 PyTorch，可在 CPU 上运行。手算、梯度累积、Adam/AdamW 与主权重算例均已通过检查，环境为 Python 3.11.15、PyTorch 2.5.1，完整结果见 [verification.json](verification.json)。正文之外的误差核对如下：
+脚本需要 PyTorch，可在 CPU 上运行。手算、梯度累积、SGD/Momentum/RMSprop/Adam 更新、L2 与 AdamW 对照及主权重算例均已通过检查，环境为 Python 3.11.15、PyTorch 2.5.1，完整结果见 [verification.json](verification.json)。正文之外的误差核对如下：
 
 | 检查 | 结果 |
 | --- | --- |
@@ -646,6 +771,8 @@ python assets/basic-train/verify_basic_train.py
 ## 参考资料
 
 - [Adam 原论文 Algorithm 1][adam]：梯度的一阶矩、非中心二阶矩、偏差校正与更新。
+- [PyTorch SGD 与 Momentum][sgd]、[RMSprop][rmsprop]：历史缓冲与逐坐标尺度。
+- [AdamW 原论文][adamw-paper]：L2 正则与解耦权重衰减的区别。
 - [Mixed Precision Training][mixed]：FP32 主权重、loss scaling 与算术精度。
 - [PyTorch Linear][linear]、[Autograd mechanics][autograd]：权重布局与自动求导语义。
 - [PyTorch AMP examples][amp]：loss scaling、梯度累积和裁剪。
@@ -669,3 +796,7 @@ python assets/basic-train/verify_basic_train.py
 [meg-linear]: https://github.com/NVIDIA/Megatron-LM/blob/d580efc68a9f0dbf1945f834f6f6200cd01d3343/megatron/core/tensor_parallel/layers.py#L445-L545
 [meg-train]: https://github.com/NVIDIA/Megatron-LM/blob/d580efc68a9f0dbf1945f834f6f6200cd01d3343/megatron/training/training.py#L1213-L1267
 [fsdp]: https://docs.pytorch.org/docs/2.14/fsdp.html#torch.distributed.fsdp.FullyShardedDataParallel.no_sync
+
+[sgd]: https://docs.pytorch.org/docs/2.14/generated/torch.optim.SGD.html
+[rmsprop]: https://docs.pytorch.org/docs/2.14/generated/torch.optim.RMSprop.html
+[adamw-paper]: https://arxiv.org/abs/1711.05101
